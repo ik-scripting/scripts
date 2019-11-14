@@ -1,0 +1,200 @@
+#!/bin/bash
+# vim: set ft=sh
+
+set -e
+
+exec 3>&1 # make stdout available as fd 3 for the result
+exec 1>&2 # redirect all output to stderr for logging
+
+source $(dirname $0)/common.sh
+
+destination=$1
+
+if [ -z "$destination" ]; then
+  echo "usage: $0 <path/to/destination>" >&2
+  exit 1
+fi
+
+# for jq
+PATH=/usr/local/bin:$PATH
+
+bin_dir="${0%/*}"
+if [ "${bin_dir#/}" == "$bin_dir" ]; then
+  bin_dir="$PWD/$bin_dir"
+fi
+
+payload=$(mktemp $TMPDIR/git-resource-request.XXXXXX)
+
+cat > $payload <&0
+
+load_pubkey $payload
+load_git_crypt_key $payload
+configure_https_tunnel $payload
+configure_git_ssl_verification $payload
+configure_credentials $payload
+
+uri=$(jq -r '.source.uri // ""' < $payload)
+branch=$(jq -r '.source.branch // ""' < $payload)
+git_config_payload=$(jq -r '.source.git_config // []' < $payload)
+ref=$(jq -r '.version.ref // "HEAD"' < $payload)
+depth=$(jq -r '(.params.depth // 0)' < $payload)
+fetch=$(jq -r '(.params.fetch // [])[]' < $payload)
+submodules=$(jq -r '(.params.submodules // "all")' < $payload)
+submodule_recursive=$(jq -r '(.params.submodule_recursive // true)' < $payload)
+submodule_remote=$(jq -r '(.params.submodule_remote // false)' < $payload)
+commit_verification_key_ids=$(jq -r '(.source.commit_verification_key_ids // [])[]' < $payload)
+commit_verification_keys=$(jq -r '(.source.commit_verification_keys // [])[]' < $payload)
+tag_filter=$(jq -r '.source.tag_filter // ""' < $payload)
+gpg_keyserver=$(jq -r '.source.gpg_keyserver // "hkp://ipv4.pool.sks-keyservers.net/"' < $payload)
+disable_git_lfs=$(jq -r '(.params.disable_git_lfs // false)' < $payload)
+clean_tags=$(jq -r '(.params.clean_tags // false)' < $payload)
+short_ref_format=$(jq -r '(.params.short_ref_format // "%s")' < $payload)
+
+configure_git_global "${git_config_payload}"
+
+if [ -z "$uri" ]; then
+  echo "invalid payload (missing uri):" >&2
+  cat $payload >&2
+  exit 1
+fi
+
+branchflag=""
+if [ -n "$branch" ]; then
+  branchflag="--branch $branch"
+fi
+
+depthflag=""
+if test "$depth" -gt 0 2> /dev/null; then
+  depthflag="--depth $depth"
+fi
+
+tagflag=""
+if [ -n "$tag_filter" ]; then
+  tagflag="--tags"
+fi
+
+if [ "$disable_git_lfs" == "true" ]; then
+  # skip the fetching of LFS objects for all following git commands
+  export GIT_LFS_SKIP_SMUDGE=1
+fi
+
+git clone --single-branch $depthflag $uri $branchflag $destination $tagflag
+
+cd $destination
+
+git fetch origin refs/notes/*:refs/notes/* $tagflag
+
+if [ "$depth" -gt 0 ]; then
+  "$bin_dir"/deepen_shallow_clone_until_ref_is_found_then_check_out "$depth" "$ref" "$tagflag"
+else
+  git checkout -q "$ref"
+fi
+
+invalid_key() {
+  echo "Invalid GPG key in: ${commit_verification_keys}"
+  exit 2
+}
+
+commit_not_signed() {
+  commit_id=$(git rev-parse ${ref})
+  echo "The commit ${commit_id} is not signed"
+  exit 1
+}
+
+if [ ! -z "${commit_verification_keys}" ] || [ ! -z "${commit_verification_key_ids}" ] ; then
+  if [ ! -z "${commit_verification_keys}" ]; then
+    echo "${commit_verification_keys}" | gpg --batch --import || invalid_key "${commit_verification_keys}"
+  fi
+  if [ ! -z "${commit_verification_key_ids}" ]; then
+    echo "${commit_verification_key_ids}" | \
+      xargs --no-run-if-empty -n1 gpg --batch --keyserver $gpg_keyserver --recv-keys
+  fi
+  git verify-commit $(git rev-list -n 1 $ref) || commit_not_signed
+fi
+
+git log -1 --oneline
+git clean --force --force -d
+git submodule sync
+
+if [ -f $GIT_CRYPT_KEY_PATH ]; then
+  echo "unlocking git repo"
+  git-crypt unlock $GIT_CRYPT_KEY_PATH
+fi
+
+
+submodule_parameters=""
+if [ "$submodule_remote" != "false" ]; then
+  submodule_parameters+=" --remote "
+fi
+if [ "$submodule_recursive" != "false" ]; then
+  submodule_parameters+=" --recursive "
+fi
+
+if [ "$submodules" != "none" ]; then
+  value_regexp="."
+  if [ "$submodules" != "all" ]; then
+    value_regexp="$(echo $submodules | jq -r 'map(. + "$") | join("|")')"
+  fi
+
+  {
+    git config --file .gitmodules --name-only --get-regexp '\.path$' "$value_regexp" |
+      sed -e 's/^submodule\.\(.\+\)\.path$/\1/'
+  } | while read submodule_name; do
+    submodule_path="$(git config --file .gitmodules --get "submodule.${submodule_name}.path")"
+
+    if [ "$depth" -gt 0 ]; then
+      git config "submodule.${submodule_name}.update" "!$bin_dir/deepen_shallow_clone_until_ref_is_found_then_check_out $depth"
+    fi
+
+    if ! [ -e "$submodule_path" ]; then
+      echo $'\e[31m'"warning: skipping missing submodule: $submodule_path"$'\e[0m'
+      continue
+    fi
+
+    git submodule update --init --no-fetch $depthflag $submodule_parameters "$submodule_path"
+
+    if [ "$depth" -gt 0 ]; then
+      git config --unset "submodule.${submodule_name}.update"
+    fi
+  done
+fi
+
+for branch in $fetch; do
+  git fetch origin $branch
+  git branch $branch FETCH_HEAD
+done
+
+if [ "$ref" == "HEAD" ]; then
+  return_ref=$(git rev-parse HEAD)
+else
+  return_ref=$ref
+fi
+
+# Store committer email in .git/committer. Can be used to send email to last committer on failed build
+# Using https://github.com/mdomke/concourse-email-resource for example
+git --no-pager log -1 --pretty=format:"%ae" > .git/committer
+
+# Store git-resource returned version ref .git/ref. Useful to know concourse
+# pulled ref in following tasks and resources.
+echo "${return_ref}" > .git/ref
+
+# Store short ref with templating. Useful to build Docker images with
+# a custom tag
+echo "${return_ref}" | cut -c1-7 | awk "{ printf \"${short_ref_format}\", \$1 }" > .git/short_ref
+
+# Store commit message in .git/commit_message. Can be used to inform about
+# the content of a successfull build.
+# Using https://github.com/cloudfoundry-community/slack-notification-resource
+# for example
+git log -1 --format=format:%B > .git/commit_message
+
+metadata=$(git_metadata)
+
+if [ "$clean_tags" == "true" ]; then
+  git tag | xargs git tag -d
+fi
+
+jq -n "{
+  version: {ref: $(echo $return_ref | jq -R .)},
+  metadata: $metadata
+}" >&3
