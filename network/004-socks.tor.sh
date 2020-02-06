@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+# https://kremalicious.com/simple-tor-setup-on-mac-os-x
 # 'Wi-Fi' or 'Ethernet' or 'Display Ethernet'
 INTERFACE=Wi-Fi
 
