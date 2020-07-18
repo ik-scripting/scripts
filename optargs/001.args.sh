@@ -1,4 +1,4 @@
-for i in "$@"; do
+for _ in "$@"; do
     case $1 in
         -s|--script) SCRIPT="$2"; shift ;;
         -t|--target) TARGET="$2"; shift ;;
