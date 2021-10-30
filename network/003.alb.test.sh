@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+# https://github.com/kubernetes-sigs/aws-alb-ingress-controller/blob/master/docs/BUILDING.md
 set -x
 set -e
 
@@ -17,6 +17,3 @@ if [[ $count -lt 120 ]]; then
 else
   echo "ERROR: Failed"
 fi
-
-
-https://github.com/kubernetes-sigs/aws-alb-ingress-controller/blob/master/docs/BUILDING.md
