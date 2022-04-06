@@ -1,13 +1,15 @@
 #!/bin/bash
 
 # Purpose - Backup & Restore workloads
+# Prerequisits
+# brew install velero
 # Usage
 # ./bin/backup-restore.sh -b true -n cicd
 # ./bin/backup-restore.sh -r true -n cicd
 
 set -eu
 
-: "${ENVIRONMENT}"
+: "${ENV}"
 : "${KUBECONFIG}"
 
 function help_text {
@@ -23,6 +25,7 @@ EOF
 BACKUP=""
 RESTORE=""
 NAMESPACE=""
+DATE=$(date +%F)
 
 while [ $# -gt 0 ]; do
     arg=$1
@@ -56,6 +59,12 @@ then
   exit 1
 fi
 
+if [ -n "${RESTORE}" ];then
+  echo "./bin/backup-restore.sh -r -n=${NAMESPACE}"
+  echo "run: velero backup get"
+  echo "run: velero restore create --from-backup <NAME> --include-namespaces ${NAMESPACE}"
+fi
+
 ###############################################
 # Perform full backup
 # $BACKUP set to a boolean (1)
@@ -76,6 +85,10 @@ fi
 if [ "${BACKUP}" == "true" ] && [ -n "${NAMESPACE}" ]
 then
   echo "backup in namespace ${NAMESPACE}"
-  velero backup create "backup-${NAMESPACE}" --snapshot-volumes=true --include-namespaces "${NAMESPACE}" --kubeconfig "${KUBECONFIG}" --wait
+  velero backup create "backup-${NAMESPACE}-${DATE}" --snapshot-volumes=true --include-namespaces "${NAMESPACE}" --kubeconfig "${KUBECONFIG}"
   echo "run 'velero backup describe backup-cicd'"
 fi
+
+# k get configmap aws-auth -o yaml > aws-auth.dev.yaml
+# k get configmap aws-auth -o yaml > aws-auth.stage.yaml
+# k get configmap aws-auth -o yaml > aws-auth.prod.yaml
