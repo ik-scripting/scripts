@@ -1,0 +1,22 @@
+[
+  {
+    "MetricName": "Percentile50%",
+    "Value": 114,
+    "Unit": "Milliseconds"
+  },
+  {
+    "MetricName": "Percentile90%",
+    "Value": 184,
+    "Unit": "Milliseconds"
+  },
+  {
+    "MetricName": "Percentile95%",
+    "Value": 207,
+    "Unit": "Milliseconds"
+  },
+  {
+    "MetricName": "Average",
+    "Value": 168.33,
+    "Unit": "Milliseconds"
+  }
+]

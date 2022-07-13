@@ -1,0 +1,27 @@
+[
+  {
+    "MetricName": "Accessibility",
+    "Value": 76,
+    "Unit": "Count"
+  },
+  {
+    "MetricName": "BestPractices",
+    "Value": 78,
+    "Unit": "Count"
+  },
+  {
+    "MetricName": "Performance",
+    "Value": 35,
+    "Unit": "Count"
+  },
+  {
+    "MetricName": "ProgressiveWebApp",
+    "Value": 64,
+    "Unit": "Count"
+  },
+  {
+    "MetricName": "SEO",
+    "Value": 70,
+    "Unit": "Count"
+  }
+]
