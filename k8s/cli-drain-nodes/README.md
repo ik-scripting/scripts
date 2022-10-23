@@ -85,5 +85,5 @@ k get deploy | grep "0/"
 - [Terraform kubernetes provider](https://github.com/hashicorp/terraform-provider-kubernetes)
 - [Python packaging](https://iq-inc.com/importerror-attempted-relative-import/)
 - [Boto3: ASG](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/autoscaling.html)
-- [Emojies](https://github.com/ikatyang/emoji-cheat-sheet/blob/master/README.md)
+- [emoji's](https://github.com/ikatyang/emoji-cheat-sheet/blob/master/README.md)
 - [Docs](https://hbidigital.atlassian.net/wiki/spaces/PAAS/pages/5524815905/Kubernetes+EKS+Upgrade)

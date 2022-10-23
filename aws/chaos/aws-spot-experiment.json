@@ -1,0 +1,33 @@
+{
+  "tags": {
+    "Name": "FIS Experiment"
+  },
+  "description": "Injecting EC2 Spot interruption signals to the target EC2 spot instances",
+  "targets": {
+    "EC2InstancesToInterrupt": {
+      "resourceType": "aws:ec2:spot-instance",
+      "resourceTags": {
+        "eks-self-managed": "true"
+      },
+      "selectionMode": "COUNT(2)"
+    }
+  },
+  "actions": {
+    "InterruptSpotInstance": {
+      "actionId": "aws:ec2:send-spot-instance-interruptions",
+      "description": "Send the appropiate signals, and then interrupt",
+      "parameters": {
+        "durationBeforeInterruption": "PT4M"
+      },
+      "targets": {
+        "SpotInstances": "EC2InstancesToInterrupt"
+      }
+    }
+  },
+  "stopConditions": [
+    {
+      "source": "none"
+    }
+  ],
+  "roleArn": "arn:aws:iam::033358980888:role/service-role/AWSFISIAMRole-1adfasdfasf"
+}
