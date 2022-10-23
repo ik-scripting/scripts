@@ -141,10 +141,30 @@ def create_role(id: str, cluster_name: str, namespace: str, service_account: str
 
     policy_arn = f'arn:aws:iam::{id}:policy/{POLICY_NAME}'
     try:
-        response = iam_client.get_policy(
+        policy = iam_client.get_policy(
             PolicyArn= policy_arn
         )
         log.debug(f'policy "{POLICY_NAME}" found')
+        response = iam_client.create_policy_version(
+            PolicyArn= policy_arn,
+            PolicyDocument= utils.read_file(POLICY_FILE_LOCATION),
+            SetAsDefault= True
+        )
+        # only 5 versions are allowed to have
+        versions = iam_client.list_policy_versions(
+            PolicyArn=policy_arn
+        )
+        for el in versions['Versions']:
+            if el['IsDefaultVersion']:
+                pass
+            else:
+                version = el['VersionId']
+                iam_client.delete_policy_version(
+                    PolicyArn=policy_arn,
+                    VersionId=version
+                )
+                log.debug(f'policy "{POLICY_NAME}" version "{version}" deleted ...')
+        log.info(f'policy "{POLICY_NAME}" updated...')
     except iam_client.exceptions.NoSuchEntityException as e:
         log.warning(f'policy "{POLICY_NAME}" not found, creating...')
         response = iam_client.create_policy(
@@ -170,7 +190,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog=NAME,
         description="CLI to manage EKS web identity IAM role with policy'")
 
-    parser.add_argument('--create', action='store_true', help="Create role with web identity")
+    parser.add_argument('--create', action='store_true', help="Create role with web identity and policy attached")
     parser.add_argument('--delete', action='store_true', help="Delete role with web identity")
     parser.add_argument('--cluster-name', default='eks-cluster-sandbox', type=str, help="Cluster to which the role should be attached")
 

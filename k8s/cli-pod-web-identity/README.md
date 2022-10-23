@@ -16,12 +16,7 @@ pipenv --rm
 pipenv graph
 ```
 
-As well as kubectl clt context should be set example `[eks:448714108511]::eks-cluster-dev(ns:kube-system)`
-and commoand should succeed `kubectl get nodes`
-
 The AWS context should be set as well. The commands `aws s3 ls` should execute successfuly.
-
-### Optional Dependencies
 
 ## Commands
 
@@ -40,4 +35,5 @@ Taint all nodes in ASG (legacy/new)
 ## Resources
 
 - [AWS Docs](https://docs.aws.amazon.com/eks/latest/userguide/associate-service-account-role.html)
-- [Botocore Exception Handling](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/error-handling.html)
+- [Boto3 Exception Handling](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/error-handling.html)
+- [Pod Identity WebHook](https://github.com/aws/amazon-eks-pod-identity-webhook)
