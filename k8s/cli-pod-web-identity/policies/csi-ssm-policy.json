@@ -4,12 +4,20 @@
     {
       "Effect": "Allow",
       "Action": [
-        "ssm:DescribeParameters",
-        "ssm:GetParameters"
+        "ssm:GetParameters",
+        "ssm:GetParameter",
+        "ssm:GetParametersByPath"
       ],
       "Resource": [
-        "arn:aws:ssm:::parameter/test-secrets-csi-driver/*"
+        "arn:aws:ssm:*:*:parameter/test-secrets-csi-driver/*"
       ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ssm:DescribeParameters"
+      ],
+      "Resource": "*"
     }
   ]
 }
