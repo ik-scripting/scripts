@@ -1,0 +1,33 @@
+accounts:
+  "048958XXXXX": sandbox
+  "448714XXXXX": dev
+  "482520XXXXX": prod
+
+commands:
+  # The assumption is, that 'taints' command executed already, as migrate asg only does migration
+  migrage_asg:
+    asg_name: eks-ondemand-airflow-group1-1.20-XXXXXX
+    scaledown_increment: 7 # currently tested with 5-15 at a time
+    # taint_all_nodes: true # should be set only on first run for an ASG
+    # whether or not node-termination-handler should terminate an eks node.
+    # When set to 'false', the nth throw a message ""node 'XXXX' not found in the cluster"
+    nth: true
+  # recylce all node in a group (in place). Node should be tainted, just for emergency cases
+  recycle:
+    label_selector: xxxxxx
+  taints:
+    asg_name:
+    # legacy nodes do not have this label set
+    label_selector: group-name=apm-enabled-spot-worker-group2-1.20
+    # could be just taint or untaint
+    taint_all_nodes: true
+    untaint_all_nodes: false
+    # legacy node groups do not have label group-name set, as a result the only way to get all the nodes
+    # is to find all ec2 attached to ASG
+    legacy: false
+slack:
+  # channel: "#alert-testing"
+  channel: "#paas-notifications"
+  ssm_token_id: eks-cluster-migrator-slack-token
+  name: eksclustermigrator
+

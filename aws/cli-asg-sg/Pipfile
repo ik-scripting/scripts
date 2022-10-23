@@ -1,0 +1,13 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+boto3 = ">=1.24.75"
+pyaml = ">=20.4.0"
+
+[dev-packages]
+
+[requires]
+python_version = "3.10"
