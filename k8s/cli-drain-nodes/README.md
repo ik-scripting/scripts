@@ -76,7 +76,7 @@ k get deploy | grep "0/"
 - [ ] Rewrite in GO and create binary
 - [ ] Dry run
 - [X] Read config from a file
-- [X] Untaint ASG
+- [X] Untainted ASG
 - [ ] Send statistics to Datadog
 - [X] Slack notification
 
