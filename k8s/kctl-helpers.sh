@@ -35,3 +35,4 @@ kubectl run mycurlpod --image=dwdraju/alpine-curl-jq -i --tty -- sh
 kubectl get pods | grep "Image" | grep "$team"
 # to retrieve an image
 kubectl get pod $pod-name -o jsonpath='{..image}' | awk '{print $1}'
+kubectl exec deploy/nginx-deployment -- date
