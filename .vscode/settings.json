@@ -1,5 +1,7 @@
 {
 	"cSpell.words": [
-		"Boto"
+		"Boto",
+		"oidc",
+		"serviceaccount"
 	]
 }

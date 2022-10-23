@@ -1,0 +1,5 @@
+{'UserId': 'AROAQWZROYKGKE5GGMCWZ:IvanKatliarchuk@hollandandbarrett.com', 'Account': '048958980748', 'Arn': 'arn:aws:sts: : 048958980748:assumed-role/AWSReservedSSO_PaasRW_7ae51b5caa2889e3/IvanKatliarchuk@hollandandbarrett.com', 'ResponseMetadata': {'RequestId': 'acb5ab07-372d-4428-9319-0d9364f06113', 'HTTPStatusCode': 200, 'HTTPHeaders': {'x-amzn-requestid': 'acb5ab07-372d-4428-9319-0d9364f06113', 'content-type': 'text/xml', 'content-length': '519', 'date': 'Sun,
+      23 Oct 2022 12: 45: 50 GMT'
+    }, 'RetryAttempts': 0
+  }
+}
