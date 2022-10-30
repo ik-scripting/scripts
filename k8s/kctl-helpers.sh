@@ -23,7 +23,6 @@ helm ls --all --short --filter "product-search"
 
 kubectl -n argocd port-forward svc/argocd-server -n argocd 8080:443
 
-
 k get pods --selector k8s-app=aws-node-termination-handler -o=custom-columns=NODE:.spec.nodeName,NAME:.metadata.name
 kubectl get nodes --selector='eks-managed=true'
 kubectl get nodes --selector='eks-self-managed=true'
