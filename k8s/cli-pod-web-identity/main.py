@@ -3,6 +3,7 @@
 
 # Usage
 # ./main.py --create
+# ./main.py --create --template iam --namespace crossplane-system --svc "provider-aws-*"
 # ./main.py --delete
 
 # Create IAM role with Web Identity Federation
@@ -31,9 +32,8 @@ identity = sts_client.get_caller_identity()
 
 NAME = "pod-web-identity"
 CURRENT_DATE_TIME = datetime.now()
-POLICY_FILE_LOCATION = "./policies/csi-ssm-policy.json"
 USER_ID= user_id=identity['UserId'].split(":")[1].lower()
-ROLE_NAME = "eks-serviceaccount-pod-web-identity-test"
+ROLE_NAME = "eks-svc-pod-web-identity-test"
 POLICY_NAME = f"{ROLE_NAME}-policy"
 NAMESPACE = "default"
 SERVICE_ACCOUNT = "pod-web-identity-test"
@@ -87,7 +87,13 @@ def delete_role(id: str) -> None:
         raise ValueError(e)
 
 
-def create_role(id: str, cluster_name: str, namespace: str, service_account: str) -> None:
+def create_role(
+    id: str,
+    cluster_name: str,
+    namespace: str,
+    service_account: str,
+    role_template: str
+    ) -> None:
     """
     Create IAM role
 
@@ -98,6 +104,7 @@ def create_role(id: str, cluster_name: str, namespace: str, service_account: str
     :returns: None
     :raises Exception if a role not found
     """
+    policy_file_location = f"./policies/{role_template}.json"
     response = eks_client.describe_cluster(
         name=cluster_name
     )
@@ -125,7 +132,7 @@ def create_role(id: str, cluster_name: str, namespace: str, service_account: str
         response = iam_client.get_role(
             RoleName= ROLE_NAME
         )
-        log.debug(f'role "{ROLE_NAME}" found')
+        log.info(f'role found \"{response["Role"]["Arn"]}\"')
     except iam_client.exceptions.NoSuchEntityException as e:
         log.warning(f'role "{ROLE_NAME}" not found, creating ...')
         # function on its own
@@ -135,7 +142,7 @@ def create_role(id: str, cluster_name: str, namespace: str, service_account: str
             Description=f'role created with "{NAME}"',
             Tags=TAGS
         )
-        log.info(f'role "{ROLE_NAME}" created...')
+        log.info(f'role created "\{response["Role"]["Arn"]}\"')
     except Exception as e:
         raise ValueError(e)
 
@@ -147,7 +154,7 @@ def create_role(id: str, cluster_name: str, namespace: str, service_account: str
         log.debug(f'policy "{POLICY_NAME}" found')
         response = iam_client.create_policy_version(
             PolicyArn= policy_arn,
-            PolicyDocument= utils.read_file(POLICY_FILE_LOCATION),
+            PolicyDocument= utils.read_file(policy_file_location),
             SetAsDefault= True
         )
         # only 5 versions are allowed to have
@@ -163,13 +170,13 @@ def create_role(id: str, cluster_name: str, namespace: str, service_account: str
                     PolicyArn=policy_arn,
                     VersionId=version
                 )
-                log.debug(f'policy "{POLICY_NAME}" version "{version}" deleted ...')
-        log.info(f'policy "{POLICY_NAME}" updated...')
+                log.debug(f'policy "{policy_arn}" version "{version}" deleted ...')
+        log.info(f'policy "{policy_arn}" updated...')
     except iam_client.exceptions.NoSuchEntityException as e:
         log.warning(f'policy "{POLICY_NAME}" not found, creating...')
         response = iam_client.create_policy(
             PolicyName=POLICY_NAME,
-            PolicyDocument=utils.read_file(POLICY_FILE_LOCATION),
+            PolicyDocument=utils.read_file(policy_file_location),
             Description=f'policy created with "{NAME}"',
             Tags=TAGS
         )
@@ -193,13 +200,16 @@ if __name__ == "__main__":
     parser.add_argument('--create', action='store_true', help="Create role with web identity and policy attached")
     parser.add_argument('--delete', action='store_true', help="Delete role with web identity")
     parser.add_argument('--cluster-name', default='eks-cluster-sandbox', type=str, help="Cluster to which the role should be attached")
+    parser.add_argument('--namespace', default=NAMESPACE, type=str, help="namespace where create a trust.")
+    parser.add_argument('--svc', default=SERVICE_ACCOUNT, type=str, help="service account for which create a role.")
+    parser.add_argument('--template', default="s3-list", type=str, help="iam policy template.", choices=['iam', 's3-list'])
 
     args = parser.parse_args()
     account_id = identity['Account']
 
     if args.create:
         create_role(id=account_id, cluster_name = args.cluster_name,
-                    namespace=NAMESPACE, service_account=SERVICE_ACCOUNT)
+                    namespace=args.namespace, service_account=args.svc, role_template=args.template)
     elif args.delete:
         delete_role(id=account_id)
 
