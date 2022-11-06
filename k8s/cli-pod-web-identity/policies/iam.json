@@ -33,7 +33,7 @@
         "iam:CreatePolicyVersion",
         "iam:DeletePolicyVersion"
       ],
-      "Resource": "arn:aws:iam::*:policy/ns/*"
+      "Resource": "arn:aws:iam::*:policy/eks-cluster-sandbox/*"
     },
     {
       "Sid": "AllowRoleCreationUnderCertainPathOnly",
@@ -41,7 +41,7 @@
       "Action": [
         "iam:CreateRole"
       ],
-      "Resource": "arn:aws:iam::*:role/ns/*"
+      "Resource": "arn:aws:iam::*:role/eks-cluster-sandbox/*"
     },
     {
       "Sid": "AttachDetachRolePolicy",
@@ -50,11 +50,11 @@
         "iam:DetachRolePolicy",
         "iam:AttachRolePolicy"
       ],
-      "Resource": "arn:aws:iam::*:role/ns/*",
+      "Resource": "arn:aws:iam::*:role/eks-cluster-sandbox/*",
       "Condition": {
         "ArnEquals": {
           "iam:PolicyARN": [
-            "arn:aws:iam::*:policy/ns/*"
+            "arn:aws:iam::*:policy/eks-cluster-sandbox/*"
           ]
         }
       }
