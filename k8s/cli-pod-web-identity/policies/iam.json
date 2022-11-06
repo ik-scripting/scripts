@@ -31,7 +31,8 @@
       "Action": [
         "iam:CreatePolicy",
         "iam:CreatePolicyVersion",
-        "iam:DeletePolicyVersion"
+        "iam:DeletePolicyVersion",
+        "iam:DeletePolicy"
       ],
       "Resource": "arn:aws:iam::*:policy/eks-cluster-sandbox/*"
     },
