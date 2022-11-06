@@ -7,9 +7,43 @@
         "iam:CreatePolicy",
         "iam:CreatePolicyVersion",
         "iam:CreateRole",
-        "iam:Get*"
+        "iam:Get*",
+        "iam:ListPolicyVersions",
+        "iam:ListAttachedRolePolicies",
+        "iam:UpdateAssumeRolePolicy"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "ActionsIfManagedWithXTool",
+      "Effect": "Allow",
+      "Action": [
+        "iam:TagPolicy",
+        "iam:UntagPolicy",
+        "iam:UntagRole",
+        "iam:TagRole",
+        "iam:DeletePolicyVersion",
+        "iam:DeletePolicy",
+        "iam:UpdateRole",
+        "iam:DeleteRole"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AttachDetachRolePolicy",
+      "Effect": "Allow",
+      "Action": [
+        "iam:DetachRolePolicy",
+        "iam:AttachRolePolicy"
+      ],
+      "Resource": "arn:aws:iam::*:role/ns/*",
+      "Condition": {
+        "ArnEquals": {
+          "iam:PolicyARN": [
+            "arn:aws:iam::*:policy/ns/*"
+          ]
+        }
+      }
     }
   ]
 }
