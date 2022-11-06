@@ -4,9 +4,6 @@
     {
       "Effect": "Allow",
       "Action": [
-        "iam:CreatePolicy",
-        "iam:CreatePolicyVersion",
-        "iam:CreateRole",
         "iam:Get*",
         "iam:ListPolicyVersions",
         "iam:ListAttachedRolePolicies",
@@ -23,11 +20,28 @@
         "iam:UntagRole",
         "iam:TagRole",
         "iam:DeletePolicyVersion",
-        "iam:DeletePolicy",
         "iam:UpdateRole",
         "iam:DeleteRole"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "CreatePolicy",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreatePolicy",
+        "iam:CreatePolicyVersion",
+        "iam:DeletePolicyVersion"
+      ],
+      "Resource": "arn:aws:iam::*:policy/ns/*"
+    },
+    {
+      "Sid": "AllowRoleCreationUnderCertainPathOnly",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole"
+      ],
+      "Resource": "arn:aws:iam::*:role/ns/*"
     },
     {
       "Sid": "AttachDetachRolePolicy",
