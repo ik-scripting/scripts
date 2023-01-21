@@ -1,0 +1,19 @@
+{
+  "id": "3d391d07-00ca-4748-9d99-3ea8b68b6594",
+  "displayName": "Stamps.com",
+  "releaseType": "Alpha",
+  "name": "Stamps.com",
+  "os": "Android",
+  "owner": {
+    "id": "08a25178-85ff-43bc-ac5d-ed78733634b7",
+    "displayName": "Alexey Karazhey",
+    "email": "alexey.karazhey@wondermentapps.com",
+    "name": "alexey.karazhey-wondermentapps.com",
+    "type": "user"
+  },
+  "platform": "React-Native",
+  "origin": "appcenter",
+  "createdAt": "2021-11-24T16: 15: 55.808Z",
+  "updatedAt": "2021-11-24T16: 15: 55.808Z",
+  "memberPermissions": [ "manager"]
+}
