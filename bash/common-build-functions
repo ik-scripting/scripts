@@ -1,0 +1,1223 @@
+#!/usr/bin/env bash
+
+export _RED_TEXT="\e[91m";
+export _NML_TEXT="\e[0m";
+export _GRN_TEXT="\e[32m";
+
+function fetchGitCommitInfo() {
+    LAST_COMMIT=$(git log --pretty -n 1)
+    OTHER_COMMITS=$(git log --oneline -n 5 --skip 1)
+    THIS_RELEASE=$(git tag --sort v:refname | grep ^[0-9]*\.[0-9]*\.[0-9]*$ | tail -n 1)
+}
+
+function generateBuildMessage() {
+    echo "*${PROJECT_NAME}*"
+    echo "Started Build"
+    echo ""
+    echo "Release Version: ${THIS_RELEASE}"
+    echo "---- Commits ----"
+    echo "${LAST_COMMIT}"
+    echo
+    echo "${OTHER_COMMITS}"
+}
+
+function stopDockerDaemon() {
+    ${STOP_DOCKER}
+}
+
+function runDockerDaemonForLifetimeOfScript() {
+
+    START_DOCKER=$(realpath ${BUILD_SCRIPT_PATH}/start_docker.sh)
+    STOP_DOCKER=$(realpath ${BUILD_SCRIPT_PATH}/stop_docker.sh)
+
+    ${START_DOCKER}
+
+    trap stopDockerDaemon EXIT
+}
+
+function logVersionToS3 {
+     # only push versions for non feature builds
+     if [ ! "${FEATURE}" = "true" ]
+     then
+        echo "${APP_VERSION}" | aws s3 cp - s3://${PROJECT_VERSION_BUCKET}/${PROJECT_NAME}/version.txt
+     fi
+}
+
+function installAwsPackagesForAlpineJava() {
+    apk update
+    apk add git docker python py-pip openssh
+    pip install --upgrade pip awscli boto3 slackclient
+}
+
+function applyGitSshKey() {
+    echo "Writing the ssh key required to authenicate with git"
+
+    mkdir -p ~/.ssh
+    echo "Host *
+        StrictHostKeyChecking no" > ~/.ssh/config
+    echo "$GIT_PRIVATE_KEY" > ~/.ssh/id_rsa
+    chmod 400 ~/.ssh/id_rsa
+}
+
+function setGitCredentials() {
+    git config user.email "concourse@hermes-europe.co.uk"
+    git config user.name "Concourse"
+}
+
+function generateAppPath() {
+    local APP_NAME="${PROJECT_NAME}-app";
+    APP_PATH=${CODE_PATH}/${APP_NAME}
+
+    echo "Using path : ${APP_PATH} as app directory"
+
+    if [ ! -d ${APP_PATH} ]
+    then
+        echo "App directory expected to be in ${APP_PATH} but was not"
+        echo "You can fix by moving the app to the expected path"
+        echo "An alternative but not recommended way is to override generateAppPath in your local project scripts"
+        echo "If you have multiple applications in one repository then you will have to handle this in your own scripts"
+        exit 1;
+    fi
+}
+
+function useRootAppPath() {
+     APP_PATH=${CODE_PATH}
+     echo "Using root path : ${APP_PATH} as app directory"
+     echo "If you are using a multi-module project then you should be using generateAppPath instead."
+}
+
+function moveToAppDirectory() {
+    cd ${APP_PATH}
+}
+
+function resolveAppVersion() {
+    if [ "${VERSION}" = "fixed" ]
+    then
+        resolveBranchAppVersion
+    else
+        findNewestAppVersion
+    fi
+}
+
+function changeGitBranchIfNeeded() {
+    if [ ! "${VERSION}" = "fixed" ];
+    then
+        checkoutGitTagVersion
+    fi
+}
+
+function findNewestAppVersion() {
+    # where we don't know what the version we are using is and have to ask git
+    echo "Fetching all git tags for this project"
+    git fetch --tags -q
+
+    if [ "${FEATURE}" = "true" ]
+    then
+        export TAG_VERSION="${ENV}"
+        export APP_VERSION="${ENV}"
+        echo "Getting the FEATURE git tag : ${TAG_VERSION}"
+    else
+        export APP_VERSION=$(git tag --sort v:refname | grep ^[0-9]*\.[0-9]*\.[0-9]*$ | tail -n 1)
+        export TAG_VERSION=$(git tag --sort v:refname | egrep "^[0-9]*\.[0-9]*\.[0-9]*(\+[0-9])?$" | tail -n 1)
+        echo "Getting the NEWEST git tag : ${TAG_VERSION}"
+    fi
+}
+
+function resolveBranchAppVersion() {
+    # where we know what fixed version we are using
+    export APP_VERSION="${POM_VERSION}"
+    export TAG_VERSION="${POM_VERSION}"
+
+    if [ "${APP_VERSION}" = "" ]
+    then
+        echo "APP_VERSION not found."
+        exit 1;
+    fi
+
+    echo "Using fixed app version ${TAG_VERSION} from branch / tag specified in pipeline..."
+}
+
+
+# deprecated as calling this directly will prevent release builds from working
+function getNewestGitTagVersion() {
+    printWarning "DEPRECATED METHOD - use the findNewestAppVersion function instead of getNewestGitTagVersion"
+    echo "Fetching all git tags for this project"
+    git fetch --tags -q
+
+    if [ "${FEATURE}" = "true" ]
+    then
+        export TAG_VERSION="${ENV}"
+        export APP_VERSION="${ENV}"
+        echo "Getting the FEATURE git tag : ${TAG_VERSION}"
+    else
+        export APP_VERSION=$(git tag --sort v:refname | grep ^[0-9]*\.[0-9]*\.[0-9]*$ | tail -n 1)
+        export TAG_VERSION=$(git tag --sort v:refname | egrep "^[0-9]*\.[0-9]*\.[0-9]*(\+[0-9])?$" | tail -n 1)
+        echo "Getting the NEWEST git tag : ${TAG_VERSION}"
+    fi
+}
+
+function getMavenPomBaseVersion() {
+
+    local version_file="pom.xml"
+
+    if [ ! -f "${version_file}" ]
+    then
+        printError "Could not find ${version_file} file - please check this file exists."
+        exit 1;
+    fi
+
+    export POM_VERSION=$(./mvnw org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version | grep -v '\[' | grep -v Download | tail -1)
+    if [ "${POM_VERSION}" = "@" ]
+    then
+        printError "Could not resolve version from POM - please check this file has the version in it and maven is correctly configured."
+        exit 1;
+    fi
+    echo "Getting the Maven Pom base version - ${POM_VERSION}"
+}
+
+function getNpmBaseVersion() {
+
+    local version_file="package.json"
+
+    if [ ! -f "${version_file}" ]
+    then
+        printError "Could not find ${version_file} file - please check this file exists."
+        exit 1;
+    fi
+
+    export POM_VERSION=$(sed -nE 's/^\s*"version": "(.*?)",$/\1/p' ${version_file} | cut -d '.' -f 1-2);
+    if [ "${POM_VERSION}" = "" ]
+    then
+        printError "Could not resolve version from NPM - please check the ${version_file} file has the version in it."
+        exit 1;
+    fi
+    echo "Getting the NPM package base version - ${POM_VERSION}"
+}
+
+function getVersionFileBaseVersion() {
+
+    local version_file="version.txt"
+
+    if [ ! -f "${version_file}" ]
+    then
+        printError "Could not find ${version_file} file - please check this file exists."
+        exit 1;
+    fi
+
+    export POM_VERSION=$(cat version.txt);
+    if [ "${POM_VERSION}" = "" ]
+    then
+        printError "Could not resolve version from ${version_file} - please check this file has the version in it."
+        exit 1;
+    fi
+
+    echo "Getting the Version file base version - ${POM_VERSION}"
+}
+
+generateBuildVersion() {
+    generateBuildTag
+}
+
+# deprecated
+function generateBuildTag() {
+    echo "Bumping the build version..."
+
+    if [ "${FEATURE}" = "true" ]
+    then
+        export APP_VERSION="${ENV}"
+        echo "Using feature tag ${APP_VERSION}"
+    else
+        export APP_VERSION=$(${BUILD_SCRIPT_PATH}/py/py/bump_version.py ${POM_VERSION} ${APP_VERSION})
+        echo "Using build tag ${APP_VERSION}"
+    fi
+
+    if [ "${APP_VERSION}" = "" ]
+    then
+        echo "Something went wrong as build tag is empty."
+        echo "Check the get base version function as it could have malfunctioned"
+        echo "Or else the base version is not in the correct format"
+        echo "Exiting build."
+        exit 1;
+    fi
+}
+
+
+
+function configureMavenToUseGlobalSettingsFile() {
+    echo "Configuring maven settings..."
+
+    export MAVEN_CONFIG="--global-settings ${CONFIG_CACHE}/maven-settings.xml"
+
+    echo "Using global maven config : ${MAVEN_CONFIG}";
+    echo "OK"
+}
+
+# TODO: deprecate this
+function buildDockerImageVersionWithMaven() {
+    echo "Compiling the code using Maven + Java"
+    echo "This also updates the maven pom version to ${APP_VERSION}"
+    echo "This version is only saved in the build tag and is not"
+    echo "Pushed back to the main branch"
+
+    echo "Bumping the build version"
+
+    local ci_profile="-Pintegration-test"
+
+    if [ "${INTEGRATION_TEST}" = "skip" ]
+    then
+        echo "Skipping integration tests for this build."
+        ci_profile="";
+    fi
+
+    local dockerPrefix=${GROUP_NAME}
+
+    if [[ ! -z "${AWS_ACCOUNT_CATEGORY}" ]]; then
+        dockerPrefix=${AWS_ACCOUNT_CATEGORY}-${dockerPrefix}
+    fi
+
+    echo "Build code using software versions:"
+    java -version
+    docker --version
+    ./mvnw --version | grep 'Apache Maven'
+
+    ./mvnw versions:set -DnewVersion=${APP_VERSION} ${MAVEN_CONFIG}
+
+    ./mvnw -Ddocker.image.prefix=${dockerPrefix} \
+     --batch-mode --update-snapshots ${MAVEN_CONFIG} \
+      verify ${ci_profile}
+
+    ./mvnw versions:commit ${MAVEN_CONFIG}
+}
+
+function buildDockerImageModuleVersionWithMaven () {
+
+    if [ "$#" == "0" ];
+    then
+         echo "Usage buildDockerImageModuleVersionWithMaven <moduleName>"
+         exit 1;
+    fi
+
+    local moduleName=$1;shift;
+
+    if [ "${moduleName}" = "" ]
+    then
+        echo "Maven module name not specified. Cannot build."
+        exit 1;
+    fi
+
+    local dockerPrefix=${GROUP_NAME}
+
+    if [[ ! -z "${AWS_ACCOUNT_CATEGORY}" ]]; then
+        dockerPrefix=${AWS_ACCOUNT_CATEGORY}-${dockerPrefix}
+    fi
+
+    local ci_profile="-Pintegration-test"
+
+    echo "Build code using software versions:"
+    java -version
+    docker --version
+    ./mvnw --version | grep 'Apache Maven'
+
+    ./mvnw -Ddocker.image.prefix=${dockerPrefix} \
+     --batch-mode --update-snapshots ${MAVEN_CONFIG} \
+      verify ${ci_profile} -pl ${moduleName}
+}
+
+function buildDockerImageModuleVersionFromCli () {
+
+    if [ "$#" == "0" ];
+    then
+         printError "Usage buildDockerImageModuleVersionFromCli <directoryName>"
+         exit 1;
+    fi
+
+    local moduleName=$1;shift;
+
+    if [ "${moduleName}" = "" ]
+    then
+        echo "Directory name not specified. Cannot build."
+        exit 1;
+    fi
+
+    echo "Build Docker Image Version ${APP_VERSION}."
+
+    docker build -t "${GROUP_NAME}/${moduleName}" "${moduleName}"
+    docker images
+
+}
+
+function updateDockerRun() {
+
+    if [ "${APP_PATH}" = "" ]
+    then
+        echo "APP_PATH not set - cannot continue."
+        echo "Make sure to call generateAppPath or useRootAppPath before calling updateDockerRun."
+        exit 1;
+    fi
+
+    local DOCKER_RUN="${APP_PATH}/Dockerrun.aws.json"
+
+    if [ ! -f ${DOCKER_RUN} ]
+    then
+        echo "Dockerrun file was expected at ${DOCKER_RUN}, but was not."
+        echo "The Dockerrun file is required by Beanstalk in order to deploy a"
+        echo "Docker container."
+    fi
+
+    local repoName=$1;
+
+    if [ "${repoName}" == "" ];
+    then
+        # use the default repo
+        repoName="${DOCKER_REPO_NAME}"
+    fi
+
+    echo "Updating ${DOCKER_RUN} with docker repository information"
+
+    # Need to escape any variables with slashes in name
+    local ESCAPED_DOCKER_REPO_NAME=$(echo "${repoName}" | sed -e "s/\//\\\\\\//g")
+
+    sed -i "s/{{ECR_ACCOUNT_NAME}}/${ECR_ACCOUNT_NAME}/g" ${DOCKER_RUN}
+    sed -i "s/{{DOCKER_REPO_NAME}}/${ESCAPED_DOCKER_REPO_NAME}/g" ${DOCKER_RUN}
+    sed -i "s/{{GROUP_NAME}}/${GROUP_NAME}/g" ${DOCKER_RUN}
+    sed -i "s/{{PROJECT_NAME}}/${PROJECT_NAME}/g" ${DOCKER_RUN}
+    sed -i "s/{{BUILD_TAG}}/${APP_VERSION}/g" ${DOCKER_RUN}
+
+    echo "Full content of Dockerrun file:"
+    echo $(cat ${DOCKER_RUN})
+}
+
+
+function gitTagAndPush() {
+    git commit --all --allow-empty --message "Build version ${APP_VERSION}"
+
+    if [ "${FEATURE}" = "true" ]
+    then
+        git tag -f ${APP_VERSION}
+        echo "Pushing feature git tag ${APP_VERSION} - will override existing tag if it exists "
+        git push origin -f ${APP_VERSION}
+    else
+        git tag ${APP_VERSION}
+        echo "Pushing unique git tag ${APP_VERSION}"
+        git push origin ${APP_VERSION}
+    fi
+}
+
+function assumeIAMRole() {
+
+    if [ "$#" == "0" ];
+    then
+         printError "Usage assumeIAMRole <role> <account> <duration> <name>"
+         exit 1;
+    fi
+
+    ROLE=$1;shift;
+    ACCOUNT=$1;shift;
+    DURATION=$1;shift;
+    NAME=$1;shift;
+
+    resetIAMRole
+
+    local role_arn="arn:aws:iam::${ACCOUNT}:role/${ROLE}";
+
+    echo "Assuming IAM Role ${role_arn}..."
+
+   # KST=access*K*ey, *S*ecretkey, session*T*oken
+    local KST=(`aws sts assume-role --role-arn ${role_arn} \
+          --role-session-name "$NAME" \
+          --duration-seconds $DURATION \
+          --query '[Credentials.AccessKeyId,Credentials.SecretAccessKey,Credentials.SessionToken]' \
+          --output text`)
+
+    export AWS_ACCESS_KEY_ID="${KST[0]}"
+    export AWS_ACCESS_KEY="${KST[0]}"
+    export AWS_SECRET_ACCESS_KEY="${KST[1]}"
+    export AWS_SECRET_KEY="${KST[1]}"
+    export AWS_SESSION_TOKEN="${KST[2]}"      # older var seems to work the same way
+    export AWS_SECURITY_TOKEN="${KST[2]}"
+    export AWS_DELEGATION_TOKEN="${KST[2]}"
+}
+
+function resetIAMRole() {
+    # Clear out existing AWS session environment, or the awscli call will fail
+    unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
+    # Old ec2 tools use other env vars
+    unset AWS_ACCESS_KEY AWS_SECRET_KEY AWS_DELEGATION_TOKEN
+}
+
+function logInToECR() {
+    echo "Logging in to AWS ECR..."
+    $(aws ecr get-login --no-include-email)
+}
+
+function ensureECRRepoExists() {
+
+    local repoName=$1;
+
+    if [ "${repoName}" == "" ];
+    then
+        # use the default repo
+        repoName="${DOCKER_REPO_NAME}"
+    fi
+
+    set +e
+    local FOUND_REPO=$(aws ecr describe-repositories | grep "${repoName}\s");
+    set -e
+
+    # Create docker repository if it doesn't exist yet
+    if [ "${FOUND_REPO}" == "" ]
+    then
+         echo "Creating NEW docker repository ${repoName}"
+        aws ecr create-repository --repository-name ${repoName}
+    fi
+}
+
+function ensureECRPolicyInPlace() {
+
+    local repoName=$1;
+
+    echo "Updating ECR repository policy to allow pull from account ${DEPLOYMENT_ACCOUNT} (${CONFIG})"
+
+    if [ "${repoName}" == "" ];
+    then
+        # use the default repo
+        repoName="${DOCKER_REPO_NAME}"
+    fi
+
+    ${BUILD_SCRIPT_PATH}/py/py/ecr/manage_ecr_repository.py \
+     --sharedAccountId "${SHARED_SERVICES_ACCOUNT}" \
+     --repositoryName "${repoName}" \
+     --principal "${DEPLOYMENT_ACCOUNT}" \
+     --policySid "${GROUP_NAME}-${CONFIG}" \
+     --region "${AWS_DEFAULT_REGION}"
+}
+
+function pushDockerImageToRepo() {
+
+    local repoName=$1;
+
+    if [ "${repoName}" == "" ];
+    then
+        # use the default repo
+        repoName=${DOCKER_REPO_NAME}
+    fi
+
+    echo "Pushing docker image to docker repository..."
+
+    docker tag "${repoName}:${DEFAULT_TAG}" "${ECR_ACCOUNT_NAME}/${repoName}:${APP_VERSION}"
+    docker push "${ECR_ACCOUNT_NAME}/${repoName}:${APP_VERSION}"
+
+    # Only push latest tag for main branch builds
+    if [ ! "${FEATURE}" = "true" ]
+    then
+        docker tag ${repoName}:${DEFAULT_TAG} ${ECR_ACCOUNT_NAME}/${repoName}:${DEFAULT_TAG}
+        docker push ${ECR_ACCOUNT_NAME}/${repoName}:${DEFAULT_TAG}
+    fi
+}
+
+function checkoutGitTagVersion() {
+
+    if [ -z ${TAG_VERSION} ]
+    then
+        printError "No git tag version set. Ensure that you have called one of the getGitTagVersion functions first"
+        exit 1;
+    fi
+
+    # Make sure we are using the tag created by the build for our deployment as the version
+    # depends on it
+    git fetch origin ${TAG_VERSION}
+    git checkout ${TAG_VERSION}
+}
+
+function readCommonBuildConfiguration() {
+    CONFIG_CACHE=${BUILD_SCRIPT_PATH}/tmp/
+
+    if [ "${PROJECT_CI_RESOURCE_BUCKET}" == "" ]
+    then
+         echo "PROJECT_CI_RESOURCE_BUCKET not set - cannot continue."
+         echo "Please set this variable to the bucket name you want to use for storing build configuration files."
+         exit 1;
+    fi
+
+    local common_config_s3_bucket="${PROJECT_CI_RESOURCE_BUCKET}/environments.json"
+    local maven_config_s3_bucket="${PROJECT_CI_RESOURCE_BUCKET}/maven-settings.xml"
+
+    echo "Pulling common build configuration from S3 bucket ${common_config_s3_bucket}"
+    echo "Writing config to ${CONFIG_CACHE}"
+    aws s3 cp s3://${common_config_s3_bucket} ${CONFIG_CACHE}
+    aws s3 cp s3://${maven_config_s3_bucket} ${CONFIG_CACHE}
+}
+
+function readClusterConfiguration() {
+    CLUSTER_CONFIG_CACHE=${BUILD_SCRIPT_PATH}/tmp/cluster.conf.json
+
+    if [ "${PROJECT_CI_RESOURCE_BUCKET}" == "" ]
+    then
+         echo "PROJECT_CI_RESOURCE_BUCKET not set - cannot continue."
+         echo "Please set this variable to the bucket name you want to use for storing build configuration files."
+         exit 1;
+    fi
+
+    local cluster_config_s3_file="${PROJECT_CI_RESOURCE_BUCKET}/${CONFIG}.cluster.conf.json"
+
+    echo "Pulling cluster configuration from S3 bucket ${common_config_s3_bucket}"
+    echo "Writing cluster configuratiion to ${CLUSTER_CONFIG_CACHE}"
+    aws s3 cp s3://${cluster_config_s3_file} ${CLUSTER_CONFIG_CACHE}
+}
+
+function defineAwsDeploymentAccount {
+    echo "Finding AWS deployment account name from environment config with alias '${CONFIG}'"
+    # determine this based on the value of ${CONFIG}
+
+     if [ "${AWS_DEPLOYMENT_ACCOUNT_ALIAS}" == "" ]
+    then
+         printImportantInfo "AWS_DEPLOYMENT_ACCOUNT_ALIAS not set - Please set this variable in your buildVars \
+            to the aws environment alias you are using. Using default alias"
+
+         local environment_alias="${CONFIG}"
+    else
+         local environment_alias="${AWS_DEPLOYMENT_ACCOUNT_ALIAS}-${CONFIG}"
+    fi
+
+    echo "Using environment alias ${environment_alias} to resolve AWS account from environments.json..."
+
+    DEPLOYMENT_ACCOUNT=`${BUILD_SCRIPT_PATH}/py/py/read_props.py ${CONFIG_CACHE}/environments.json --filter alias="${environment_alias}" --fetch account_name`
+    ENVIRONMENT_PROFILE=`${BUILD_SCRIPT_PATH}/py/py/read_props.py ${CONFIG_CACHE}/environments.json --filter alias="${environment_alias}" --fetch profile`
+
+    if [ "${DEPLOYMENT_ACCOUNT}" == "" ]
+    then
+         printError "DEPLOYMENT_ACCOUNT not set - cannot continue. \
+            Please ensure that you have alias ${environment_alias} defined in environments.json (shown below):"
+         cat "${CONFIG_CACHE}/environments.json"
+         exit 1;
+    fi
+
+    if [ "${ENVIRONMENT_PROFILE}" == "" ]
+    then
+         ENVIRONMENT_PROFILE="None"
+    fi
+
+    echo "Using '${DEPLOYMENT_ACCOUNT}' as the AWS deployment account..."
+    echo "Using '${ENVIRONMENT_PROFILE}' as the environment profile..."
+}
+
+function generateBeanstalkAppEnvironmentNames() {
+    APPLICATION_NAME="${PROJECT_NAME}-eb";
+    local FULL_ENVIRONMENT_NAME="${PROJECT_NAME}-${ENV}-env";
+    # Make environment name Beanstalk compliant by limiting length and eliminating dashes at end
+    DEPLOY_ENVIRONMENT=$(echo ${FULL_ENVIRONMENT_NAME:0:40} | sed -e 's/\-$//')
+}
+
+function installPythonBeanstalkPrerequisites() {
+    printWarning "DEPRECATED METHOD - these dependencies are preinstalled by the build image"
+}
+
+function installPythonAwsPrerequisites() {
+    pip install -r ${BUILD_SCRIPT_PATH}/py/py/requirements.txt
+}
+
+function updateBeanstalkResourcesInDeploymentAccount() {
+
+    validateReadyForDeployment
+
+    rememberIamRole
+
+    elevateGlobalPermissionsForDeployment
+    deployBeanstalkResources
+
+    useLastIamRole
+}
+
+function updateEcsResourcesInDeploymentAccount() {
+
+    readClusterConfiguration
+
+    validateReadyForDeployment
+
+    rememberIamRole
+
+    elevateGlobalPermissionsForDeployment
+    deployServiceToEcs "$@"
+
+    useLastIamRole
+}
+
+function validateReadyForDeployment {
+    if [ "${DEPLOYMENT_ACCOUNT}" == "" ]
+    then
+         echo "DEPLOYMENT_ACCOUNT not set - cannot continue."
+         echo "Please ensure that you have alias ${CONFIG} defined in environments.json"
+         exit 1;
+    fi
+
+    if [ "${DEPLOYMENT_ROLE}" == "" ]
+    then
+         echo "DEPLOYMENT_ROLE not set - cannot continue."
+         echo "Please ensure that you have DEPLOYMENT_ROLE defined in buildVars"
+         exit 1;
+    fi
+
+    if [ "${CONFIG}" == "" ]
+    then
+         echo "CONFIG not set - cannot continue."
+         echo "Please ensure that you have alias ${CONFIG} defined in environments.json"
+         exit 1;
+    fi
+
+}
+
+
+function deployBeanstalkResources() {
+
+    EBEXTENSIONS=${APP_PATH}/.ebextensions
+    DOCKERRUN=${APP_PATH}/Dockerrun.aws.json
+    ENV_CONFIG=${SCRIPT_DIR}/../../env/${CONFIG}.conf.json
+    PROFILE_CONFIG=${SCRIPT_DIR}/../../env/${ENVIRONMENT_PROFILE}.profile.json
+    SOLUTION_CONFIG=${SCRIPT_DIR}/../../env/${CONFIG}.solution.txt
+    TAG_CONFIG=${SCRIPT_DIR}/../../env/${CONFIG}.tag.json
+
+    AWS_DEPLOYMENT_ROLE="arn:aws:iam::${DEPLOYMENT_ACCOUNT}:role/${DEPLOYMENT_ROLE}";
+    AWS_BEANSTALK_SERVICE_ROLE="arn:aws:iam::${DEPLOYMENT_ACCOUNT}:role/aws-elasticbeanstalk-service-enhanced-role"
+
+    echo "Using IAM deployment role : '${AWS_DEPLOYMENT_ROLE}' (this is used to trigger the deployment in the right account)"
+    echo "Using IAM service role : '${AWS_BEANSTALK_SERVICE_ROLE}' (this is used to give the right set of permissions to "
+    echo "beanstalk to build it's own cloudformation stack)"
+
+    if [ ! -f "${PROFILE_CONFIG}" ];
+    then
+        echo "No ${ENVIRONMENT_PROFILE} environment profile found. Continuing without...";
+        PROFILE_CONFIG="";
+    fi
+
+     # Indicate to the deployment task that we want to override application versions - normally these
+     # are immutable and will be skipped if the version hasn't changed.
+     if [ "${FEATURE}" = "true" ]
+     then
+        OVERRIDE_APP_VERSION="true"
+     fi
+
+
+    ${BUILD_SCRIPT_PATH}/py/deploy_scripts/create_beanstalk_resources.py --application "${APPLICATION_NAME}" \
+     --beanstalkservicerole "${AWS_BEANSTALK_SERVICE_ROLE}" \
+     --appversion "${APP_VERSION}" \
+     --overrideAppversion "${OVERRIDE_APP_VERSION}" \
+     --dockerrun "${DOCKERRUN}" \
+     --ebextensions "${EBEXTENSIONS}"  \
+     --appEnvironment "${DEPLOY_ENVIRONMENT}"  \
+     --envConfFile "${ENV_CONFIG}" \
+     --profileConfFile "${PROFILE_CONFIG}" \
+     --slnConfFile "${SOLUTION_CONFIG}" \
+     --tagsFile "${TAG_CONFIG}" \
+     --template "${DEPLOY_ENVIRONMENT}:${APP_VERSION}"
+}
+
+# deprecated - use updateBeanstalkResourcesInDeploymentAccount to handle swapping roles without an extra service call to
+# change permissions.
+function createBeanstalkResources() {
+    printWarning "DEPRECATED METHOD - use the updateBeanstalkResourcesInDeploymentAccount function instead of createBeanstalkResources"
+    deployBeanstalkResources
+}
+
+function fetchAwsCredentialsFile() {
+    local common_credentials_s3_bucket="${PROJECT_CI_RESOURCE_BUCKET}/credentials"
+
+    echo "Pulling aws credentials file from S3 bucket ${common_config_s3_bucket}"
+    aws s3 cp s3://${common_credentials_s3_bucket} ~/.aws/credentials
+}
+
+function elevateGlobalPermissionsForLegacy() {
+
+    printWarning "DEPRECATED METHOD - Legacy account disabled - to update DNS use updateDNSInSharedAccount"
+}
+
+function elevateGlobalPermissionsForSharedServiceAccount() {
+
+    resetIAMRole
+
+    local ROLE="${DEPLOYMENT_ROLE}"
+    local ACCOUNT="${SHARED_SERVICES_ACCOUNT}"
+    local DURATION="900"
+    local NAME="ConcourseAssume"
+
+    assumeIAMRole $ROLE $ACCOUNT $DURATION $NAME
+}
+
+function elevateGlobalPermissionsForDeployment() {
+
+    resetIAMRole
+
+    local DURATION="${ALLOWED_APPLICATION_DEPLOYMENT_DURATION_SECS}"
+
+    if [ "${DURATION}" == "" ];
+    then
+        # default duration to assume the deployment role for
+        local DURATION="900"
+    fi
+
+    local ROLE="${DEPLOYMENT_ROLE}"
+    local ACCOUNT="${DEPLOYMENT_ACCOUNT}"
+    local NAME="ConcourseAssume"
+
+    assumeIAMRole $ROLE $ACCOUNT $DURATION $NAME
+}
+
+
+
+function getBeanstalkEndpointUrl {
+
+    rememberIamRole
+
+    elevateGlobalPermissionsForDeployment
+
+    APPLICATION_ENDPOINT_URL=$(aws elasticbeanstalk describe-environments --application-name ${APPLICATION_NAME} --environment-names ${DEPLOY_ENVIRONMENT} --query Environments[0].CNAME);
+
+    if [ "${APPLICATION_ENDPOINT_URL}" == "" ]
+    then
+         printError "Could not resolve APPLICATION_ENDPOINT_URL - check the application and deployment parameters are correct."
+         exit 1;
+    fi
+
+    echo "Resolved beanstalk endpoint '${APPLICATION_ENDPOINT_URL}'"
+
+    useLastIamRole
+}
+
+function updateDNS {
+    printWarning "DEPRECATED METHOD - use the updateDNSInSharedAccount function instead of updateDNS"
+    updateDnsRecords
+}
+
+function updateDNSInSharedAccount {
+
+    rememberIamRole
+
+    elevateGlobalPermissionsForSharedServiceAccount
+    updateDnsRecords "$@"
+
+    useLastIamRole
+}
+
+function updateApiGatewayDomainName {
+     local domain_name=$1;
+     local api_domain_prefix=$2;
+     local stage=$3;
+     local api_name=$4;
+
+     ${BUILD_SCRIPT_PATH}/py/deploy_scripts/api_gateway.py \
+     --domainName ${domain_name} \
+     --apiDomainPrefix ${api_domain_prefix} \
+     --stage ${stage} \
+     --apiName ${api_name}
+}
+
+function assignApiKeys {
+     local proxy=$1;
+     local hosted_zone=$2;
+     local stage=$3;
+     local prefix=$4;
+
+     ${BUILD_SCRIPT_PATH}/py/py/apigateway/assign_key.py \
+      --proxy "${proxy}" \
+      --hosted-zone "${hosted_zone}" \
+      --stage "${stage}" \
+      --prefix "${prefix}"
+}
+
+function updateDnsRecords {
+
+    local public_endpoint=$1;
+
+    if [ "${public_endpoint}" == "" ];
+    then
+        public_endpoint="public"
+    fi
+
+    if [ "${DNS_UPDATE}" = "skip" ] || [ "${FEATURE}" = "true" ]
+    then
+        echo "Skipping DNS update for this deployment."
+        return;
+    fi
+
+    if [ "${DNS_NAME}" == "" ]
+    then
+         echo "DNS_NAME not set - cannot continue."
+         echo "Please ensure that you have this variable set in buildVars"
+         exit 1;
+    fi
+
+    if [ "${DNS_SUB}" == "" ]
+    then
+         echo "DNS_SUB not set - cannot continue."
+         echo "Please ensure that you have this variable set in buildVars"
+         exit 1;
+    fi
+
+    if [ "${APPLICATION_ENDPOINT_URL}" == "" ]
+    then
+         echo "APPLICATION_ENDPOINT_URL not set - cannot continue."
+         echo "Please ensure that you have set this variable"
+         echo "One option is to call getBeanstalkEndpointUrl"
+         exit 1;
+    fi
+
+     # update same account DNS
+     local SUBDOMAIN="${DNS_SUB}.${CONFIG}";
+
+     ${BUILD_SCRIPT_PATH}/py/deploy_scripts/r53_update_records.py \
+     --dnsName ${DNS_NAME} \
+     --subDomain ${SUBDOMAIN} \
+     --endpointUrl ${APPLICATION_ENDPOINT_URL} \
+     --updateDnsZone "${public_endpoint}"
+}
+
+function rememberIamRole {
+    echo "Remembering current AWS credentials..."
+
+    LAST_AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+    LAST_AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    LAST_AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+    LAST_AWS_SECURITY_TOKEN=${AWS_SECURITY_TOKEN}
+    LAST_AWS_ACCESS_KEY=${AWS_ACCESS_KEY}
+    LAST_AWS_SECRET_KEY=${AWS_SECRET_KEY}
+    LAST_AWS_DELEGATION_TOKEN=${AWS_DELEGATION_TOKEN}
+}
+
+function useLastIamRole {
+    echo "Restoring last remembered AWS credentials..."
+
+    AWS_ACCESS_KEY_ID=${LAST_AWS_ACCESS_KEY_ID}
+    AWS_SECRET_ACCESS_KEY=${LAST_AWS_SECRET_ACCESS_KEY}
+    AWS_SESSION_TOKEN=${LAST_AWS_SESSION_TOKEN}
+    AWS_SECURITY_TOKEN=${LAST_AWS_SECURITY_TOKEN}
+    AWS_ACCESS_KEY=${LAST_AWS_ACCESS_KEY}
+    AWS_SECRET_KEY=${LAST_AWS_SECRET_KEY}
+    AWS_DELEGATION_TOKEN=${LAST_AWS_DELEGATION_TOKEN}
+
+    unset LAST_AWS_ACCESS_KEY_ID
+    unset LAST_AWS_SECRET_ACCESS_KEY
+    unset LAST_AWS_SESSION_TOKEN
+    unset LAST_AWS_SECURITY_TOKEN
+    unset LAST_AWS_ACCESS_KEY
+    unset LAST_AWS_SECRET_KEY
+    unset LAST_AWS_DELEGATION_TOKEN
+}
+
+function updateDashboardInDeploymentAccount {
+    rememberIamRole
+
+    elevateGlobalPermissionsForDeployment
+    updateDashboard "$@"
+
+    useLastIamRole
+}
+
+# deprecated - use updateDashboardInDeploymentAccount function
+function updateDashboard {
+    printWarning "DEPRECATED METHOD - use the updateDashboardInDeploymentAccount function instead of updateDashboard"
+    if [ "$#" == "0" ];
+    then
+         printError "Usage updateDashboard <filename>"
+         exit 1;
+    fi
+
+    local filename=$1;shift;
+
+    AWS_DEPLOYMENT_ROLE="arn:aws:iam::${DEPLOYMENT_ACCOUNT}:role/${DEPLOYMENT_ROLE}";
+
+    echo "Creating dashboard ${PROJECT_NAME}..."
+
+    ${BUILD_SCRIPT_PATH}/py/deploy_scripts/update_cw_dashboard.py \
+     --file "${filename}" \
+     --env "${ENV}" \
+     --name "${PROJECT_NAME}" \
+     --appEnvironment "${DEPLOY_ENVIRONMENT}" \
+     --region ${AWS_DEFAULT_REGION}
+}
+
+function publishResultsToS3Bucket() {
+    local report_src=$1;shift;
+    local report_dest=$1;shift;
+
+    aws s3 cp --recursive "${report_src}" "s3://${PROJECT_BUILD_REPORT_BUCKET}/${PROJECT_NAME}/${APP_VERSION}/${report_dest}/"
+}
+
+function schedulePerformanceTestOnDeploymentAccount() {
+
+    validateReadyForDeployment
+
+    rememberIamRole
+
+    elevateGlobalPermissionsForDeployment
+
+    schedulePerformanceTest "$@"
+
+    useLastIamRole
+}
+
+# TODO: fix this
+function schedulePerformanceTest() {
+
+    if [ "$#" == "0" ];
+    then
+         printError "Usage schedulePerformanceTest <moduleName>"
+         exit 1;
+    fi
+
+    local moduleName=$1;shift;
+
+    echo "Scheduling performance test..."
+
+    local perf_path="${CODE_PATH}/${moduleName}"
+    local config_file=$(realpath "${perf_path}/env/${CONFIG}.conf.json")
+    local task_def="${perf_path}/ecs-task-def.json"
+    local event_target="${perf_path}/event-target.json"
+
+    local full_image_name="${GROUP_NAME}/${moduleName}"
+
+    registerReportTaskDef "${full_image_name}" "${task_def}" "${config_file}" "performance"
+
+    # capture the result from script then delete the tmp file
+    local taskArn=$(cat /tmp/common-build-functions__registerReportTaskDef)
+    rm /tmp/common-build-functions__registerReportTaskDef
+
+    scheduleTask "${event_target}" "${taskArn}"
+}
+
+function deployServiceToEcs() {
+    local module_path=$1
+
+    local deploy_config_dir="${module_path}/deploy"
+
+    local parameters="Image=${ECR_ACCOUNT_NAME}/${DOCKER_REPO_APP}:${APP_VERSION} \
+ProjectName=${PROJECT_NAME} \
+Version=${APP_VERSION} \
+ClusterName=${CLUSTER_NAME} \
+Env=${ENV} \
+Region=${AWS_DEFAULT_REGION}"
+
+    task_def_file="${module_path}/deploy/ecs-task-def.conf.json"
+    target_config_file="${module_path}/deploy/targetgroup.conf.json"
+    listenerrule_config_file="${module_path}/deploy/listenerrule.conf.json"
+    service_config_file="${module_path}/deploy/service.conf.json"
+    local_deployment_config="${module_path}/deploy/env/${CONFIG}.conf.json"
+    
+    remote_deployment_config="${CLUSTER_CONFIG_CACHE}"
+
+    ${BUILD_SCRIPT_PATH}/py/deploy_scripts/ecs_create_service.py \
+    --ecsTaskDef ${task_def_file} \
+    --targetGroupConfFile ${target_config_file} \
+    --listenerRuleConfFile ${listenerrule_config_file} \
+    --serviceConfFile ${service_config_file} \
+    --localDeployConfFile ${local_deployment_config} \
+    --remoteDeployConfFile ${remote_deployment_config} \
+    --buildParams ${parameters}
+}
+
+function deployCftStackWithParameters {
+    local file_name=$1;
+    local stack_name=$2;
+
+    if [ "${CLOUDFORMATION_TEMPLATES_PATH}" == "" ]
+    then
+         printError "CLOUDFORMATION_TEMPLATES_PATH not set - you must set this in your deployment script to tell me where your cloudformation template are."
+         exit 1;
+    fi
+
+    if [ "${CLOUDFORMATION_CONFIG_PATH}" == "" ]
+    then
+         printError "CLOUDFORMATION_CONFIG_PATH not set - you must set this in your deployment script to tell me where your cloudformation configs are."
+         exit 1;
+    fi
+
+    local template_file="${CLOUDFORMATION_TEMPLATES_PATH}/${file_name}.yml"
+    if [ ! -f ${template_file} ];
+    then
+        local template_file="${CLOUDFORMATION_TEMPLATES_PATH}/${file_name}.json"
+    fi
+
+    if [ ! -f ${template_file} ];
+    then
+       echo "Could not find a cloudformation template called ${file_name} with yml or json extension."
+       exit 1;
+    fi
+
+    local env_config="${CLOUDFORMATION_CONFIG_PATH}/${file_name}-${CONFIG}.json"
+
+    if [ ! -f ${env_config} ];
+    then
+        echo "Could not find a cloudformation parameter file called ${env_config}."
+        exit 1;
+    fi
+
+    echo "Deploying cloudformation stack named ${file_name}..."
+
+    ${PY_SCRIPT_PATH}/deploy_scripts/deploy_cloud_formation_stack.py \
+     --envConfFile $(realpath "${env_config}") \
+     --stackName "${stack_name}" \
+     --templateFile $(realpath "${template_file}") \
+     --buildParams "Environment=${ENV}" \
+     --capabilities "CAPABILITY_IAM"
+}
+
+function performCodeCoverageAnalysisWithMaven() {
+
+    if [ "${FEATURE}" = "true" ]; then
+        echo "Not performing code coverage analysis as FEATURE is true";
+        exit 0;
+    fi
+
+    if [[ -z ${MAVEN_CONFIG} ]]; then
+        printError "MAVEN_CONFIG is not set. Have you run configureMavenToUseGlobalSettingsFile ?";
+        exit 1;
+    fi
+
+    if [[ -z ${SONAR_HOST} ]]; then
+        printError "SONAR_HOST is not set. Please set it in buildVars";
+        exit 1;
+    fi
+
+    if [[ -z ${SONAR_LOGIN} ]]; then
+        printError "SONAR_LOGIN is not set. Please set it in buildVars";
+        exit 1;
+    fi
+
+    if [[ -z ${MAIN_BRANCH} ]]; then
+        printError "MAIN_BRANCH is not set. Please set it in buildVars";
+        exit 1;
+    fi
+
+    # Run analysis in sonar
+    echo "Performing Sonar Code Coverage Analysis..."
+    ./mvnw  -Dsonar.host.url="${SONAR_HOST}" \
+            -Dsonar.branch="${MAIN_BRANCH}" \
+            -Dsonar.login="${SONAR_LOGIN}" \
+            ${MAVEN_CONFIG} \
+        sonar:sonar
+}
+
+function useDefaultModuleNaming() {
+    printImportantInfo "Using default module naming - if you need to customise module names then you can remove the
+        useDefaultModuleNaming method from your build scripts"
+
+    export MODULE_APP="${PROJECT_NAME}-app"
+    export MODULE_PERF="${PROJECT_NAME}-perf"
+
+    export DOCKER_REPO_APP="${GROUP_NAME}/${MODULE_APP}"
+    export DOCKER_REPO_PERF="${GROUP_NAME}/${MODULE_PERF}"
+}
+
+
+function sendNotification() {
+    local channel=$1;
+    local message=$2;
+
+    if [ "$#" == "0" ];
+    then
+         printError "Usage schedulePerformanceTest <moduleName>"
+         exit 1;
+    fi
+
+    if [ "${SLACK_API_TOKEN}" = "" ];
+    then
+        printWarning "SLACK_API_TOKEN is not set. Please set it in your build to enable slack notifications";
+    else
+        echo "sending a message to slack # ${channel}..."
+        ${BUILD_SCRIPT_PATH}/py/py/slack/send_message.py --message "${message}" --channel "${channel}"
+    fi
+}
+
+function _buildSlackNotificationPayload() {
+
+    local user=$1
+    local message=$2
+
+    # not very elegant but it works
+    cat <<EOF
+{
+    "text": "${message}",
+    "username": "${user}"
+}
+EOF
+}
+
+function sendSlackNotificationViaWebhook() {
+
+    local user=concourse_webhook
+    local message=$1
+
+    if [[ "${SLACK_HOOK}" == "" ]]; then
+        echo -e "Cannot send Slack notification as required variable \"SLACK_HOOK\" is missing";
+        echo -e "\tExample: https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX";
+        exit 1;
+    fi
+
+    if [[ "${message}" == "" ]]; then
+        message="sendSlackNotificationViaWebhook was called but a message argument was not provided :poop:";
+    fi
+
+    curl -X POST -H 'Content-Type: application/json' \
+        --data "$(_buildSlackNotificationPayload "${user}" "${message}")" \
+    $SLACK_HOOK
+}
+
+
+## wrapper functions - wrap up multiple calls into one useful function call.
+
+function publishDockerImageToECR() {
+
+    if [ "$#" == "0" ];
+    then
+         printError "Usage publishDockerImageToECR <moduleName>"
+         exit 1;
+    fi
+
+    local repoName=$1;shift;
+
+    if [ "${repoName}" = "" ]
+    then
+        printError "Docker directory name not specified. Cannot build."
+        exit 1;
+    fi
+
+    if [[ -z "${AWS_ACCOUNT_CATEGORY}" ]]; then
+        local ecrMsg="AWS_ACCOUNT_CATEGORY is not set. CloudReach governance";
+        ecrMsg="${ecrMsg} policy compliant urls must contain this parameter.";
+        ecrMsg="${ecrMsg} AWS_ACCOUNT_CATEGORY can be one of";
+        ecrMsg="${ecrMsg} ['shared', 'dgw', 'api', 'srv', 'dat', cms']";
+        printWarning $ecrMsg
+    else
+        repoName="${AWS_ACCOUNT_CATEGORY}-${repoName}"
+    fi
+
+    ensureECRRepoExists "${repoName}"
+
+    pushDockerImageToRepo "${repoName}"
+}
+
+## utility
+
+function printError() {
+    echo "*ERROR*ERROR**ERROR*ERROR**ERROR*ERROR**ERROR*ERROR**ERROR*ERROR**ERROR*ERROR*"
+    echo -e "${_RED_TEXT}$1${_NML_TEXT}\n"
+    echo "*ERROR*ERROR**ERROR*ERROR**ERROR*ERROR**ERROR*ERROR**ERROR*ERROR**ERROR*ERROR*"
+}
+
+function printSuccess() {
+    echo -e "${_GRN_TEXT}$1${_NML_TEXT}\n"
+}
+
+function printWarning() {
+    echo
+    echo "*#####*#####*#####*#####*#####*#####*#####*#####*#####*#####*#####*#####*"
+    echo "${1}"
+    echo "*#####*#####*#####*#####*#####*#####*#####*#####*#####*#####*#####*#####*"
+    echo
+}
+
+function printImportantInfo() {
+    echo
+    echo "<<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>>"
+    echo "${1}"
+    echo "<<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>>"
+    echo
+}
