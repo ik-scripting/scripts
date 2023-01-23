@@ -1,0 +1,28 @@
+{
+    "environments": [
+        {
+            "enterprise-services-ecs-cluster": [
+                {
+                    "Key": "ClusterArn",
+                    "ExportName": "<project-name>-srv-enterprise-services-ecs-cluster-dev::ClusterArn"
+                },
+                {
+                    "Key": "LoadBalancer",
+                    "ExportName": "<project-name>-srv-enterprise-services-app-load-balancer-dev::LoadBalancer"
+                },
+                {
+                    "Key": "LoadBalancerListener",
+                    "ExportName": "<project-name>-srv-enterprise-services-app-load-balancer-dev::LoadBalancerListener"
+                },
+                {
+                    "Key": "VpcId",
+                    "ExportName": "<project-name>-srv-nonprod-vpc-srv-dev-vpc::VpcId"
+                },
+                {
+                    "Key": "ClusterName",
+                    "Value": "sample-enterprise-services-ecs-cluster"
+                }
+            ]
+        }
+    ]
+}

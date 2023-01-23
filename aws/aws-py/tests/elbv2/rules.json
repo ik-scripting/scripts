@@ -1,0 +1,48 @@
+{
+    "3xRules": {
+        "Rules": [
+            { "Priority": "1" },
+            { "Priority": "default" },
+            { "Priority": "2" }
+        ]
+    },
+    "1xRules": {
+        "Rules": [{ "Priority": "default" }]
+    },
+    "7xRules": {
+        "Rules": [
+            { "Priority": "1" },
+            { "Priority": "default" },
+            { "Priority": "2" },
+            { "Priority": "4" },
+            { "Priority": "3" },
+            { "Priority": "6" },
+            { "Priority": "5" }
+        ]
+    },
+    "4xRules": {
+        "Rules": [
+            { "Priority": "1" },
+            { "Priority": "default" },
+            { "Priority": "4" },
+            { "Priority": "3" }
+        ]
+    },
+    "11xRules": {
+        "Rules": [
+            { "Priority": "1" },
+            { "Priority": "default" },
+            { "Priority": "2" },
+            { "Priority": "4" },
+            { "Priority": "3" },
+            { "Priority": "6" },
+            { "Priority": "5" },
+            { "Priority": "8" },
+            { "Priority": "7" },
+            { "Priority": "10" }
+        ]
+    },
+    "empty": {
+        "Rules": []
+    }
+}

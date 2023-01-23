@@ -1,0 +1,18 @@
+#
+####### python requirements #######
+#
+###### Requirements without Version Specifiers ######
+# https://mock.readthedocs.io/en/latest/
+mock
+# https://moto.readthedocs.io/en/latest/
+moto
+# https://sure.readthedocs.io/en/latest/
+sure
+# https://pypi.python.org/pypi/parameterized
+parameterized
+coverage
+
+# style guide
+flake8
+# https://www.pylint.org
+pylint

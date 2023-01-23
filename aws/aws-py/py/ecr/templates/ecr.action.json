@@ -1,0 +1,7 @@
+{
+  "Action": [
+    "ecr:GetDownloadUrlForLayer",
+    "ecr:BatchGetImage",
+    "ecr:BatchCheckLayerAvailability"
+  ]
+}

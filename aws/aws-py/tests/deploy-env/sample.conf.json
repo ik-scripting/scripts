@@ -1,0 +1,14 @@
+[
+    {
+        "Key": "VpcId",
+        "ExportName": "<project-name>-srv-nonprod-vpc-srv-dev-vpc::VpcId"
+    },
+    {
+        "Key": "ServiceName",
+        "Value": "my-service-v1"
+    },
+    {
+        "Key": "MyEnvironmentVar",
+        "Value": "my-environment-var"
+    }
+]

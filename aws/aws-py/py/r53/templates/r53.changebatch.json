@@ -1,0 +1,18 @@
+{
+  "Comment": "Upserting CNAME for Beanstalk application",
+  "Changes": [
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+          "Name": "{domain_name}",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [
+          {
+            "Value": "{end_domain}"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+    "Name": "my-target-group",
+    "Protocol": "HTTP",
+    "Port": 80,
+    "VpcId": "{VpcId}",
+    "HealthCheckProtocol": "HTTP",
+    "HealthCheckPath": "/my-service/v1/health",
+    "HealthCheckIntervalSeconds": 10,
+    "HealthCheckTimeoutSeconds": 5,
+    "HealthyThresholdCount": 2,
+    "UnhealthyThresholdCount": 2,
+    "Matcher": {
+        "HttpCode": "200-299"
+    }
+}

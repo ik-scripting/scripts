@@ -1,0 +1,27 @@
+{
+    "stringVal": "{StringValue}",
+    "numVal": "{NumberValue}",
+    "nestVal": {
+        "numVal": "{NumberValue}"
+    },
+    "listVal": [
+        {
+            "numVal": "{NumberValue}",
+            "numVal2": "{NumberValue}",
+            "nestVal": {
+                "numVal": "{NumberValue}"
+            }
+        },
+        {
+            "listVal": [
+                "{NumberValue}"
+            ]
+        },
+        {
+            "stuffOfThings": {
+                "key": "stringKey",
+                "value": "{StringNumber}"
+            }
+        }
+    ]
+}

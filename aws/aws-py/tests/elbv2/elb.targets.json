@@ -1,0 +1,92 @@
+ {
+     "TargetHealthDescriptions": [
+        {
+            "Target": {
+                "Id": "i-08c7d90851e5d5682",
+                "Port": 32999
+            },
+            "TargetHealth": {
+                "State": "draining",
+                "Reason": "Target.DeregistrationInProgress",
+                "Description": "Target deregistration is in progress"
+            }
+        },
+        {
+            "Target": {
+                "Id": "i-06bee094afc1e06e0",
+                "Port": 32978
+            },
+            "TargetHealth": {
+                "State": "draining",
+                "Reason": "Target.DeregistrationInProgress",
+                "Description": "Target deregistration is in progress"
+            }
+        },
+        {
+            "Target": {
+                "Id": "i-08c7d90851e5d5682",
+                "Port": 32997
+            },
+            "TargetHealth": {
+                "State": "draining",
+                "Reason": "Target.DeregistrationInProgress",
+                "Description": "Target deregistration is in progress"
+            }
+        },
+        {
+            "Target": {
+                "Id": "i-08c7d90851e5d5682",
+                "Port": 32995
+            },
+            "TargetHealth": {
+                "State": "draining",
+                "Reason": "Target.DeregistrationInProgress",
+                "Description": "Target deregistration is in progress"
+            }
+        },
+        {
+            "Target": {
+                "Id": "i-08c7d90851e5d5682",
+                "Port": 32994
+            },
+            "TargetHealth": {
+                "State": "draining",
+                "Reason": "Target.DeregistrationInProgress",
+                "Description": "Target deregistration is in progress"
+            }
+        },
+        {
+            "Target": {
+                "Id": "i-06bee094afc1e06e0",
+                "Port": 32981
+            },
+            "TargetHealth": {
+                "State": "initial",
+                "Reason": "Elb.RegistrationInProgress",
+                "Description": "Target registration is in progress"
+            }
+        },
+        {
+            "Target": {
+                "Id": "i-08c7d90851e5d5682",
+                "Port": 33000
+            },
+            "TargetHealth": {
+                "State": "draining",
+                "Reason": "Target.DeregistrationInProgress",
+                "Description": "Target deregistration is in progress"
+            }
+        },
+        {
+            "Target": {
+                "Id": "i-06bee094afc1e06e0",
+                "Port": 32980
+            },
+            "TargetHealth": {
+                "State": "draining",
+                "Reason": "Target.DeregistrationInProgress",
+                "Description": "Target deregistration is in progress"
+            }
+        }
+    ]
+}

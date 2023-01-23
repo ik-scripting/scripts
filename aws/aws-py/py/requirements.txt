@@ -1,0 +1,7 @@
+#
+####### python requirements #######
+#
+###### Requirements without Version Specifiers ######
+boto3
+httplib2
+awscli

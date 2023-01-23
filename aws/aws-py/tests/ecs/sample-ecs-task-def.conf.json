@@ -1,0 +1,31 @@
+{
+    "containerDefinitions": [
+        {
+            "name": "{ServiceName}",
+            "image": "group/my-service-v1:latest",
+            "essential": true,
+            "memory": 1000,
+            "cpu": 10,
+            "portMappings": [
+                {
+                    "containerPort": 8080
+                }
+            ],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "{ServiceName}",
+                    "awslogs-region": "eu-west-1"
+                }
+            },
+            "environment": [
+                {
+                    "name": "myEnvironmentVar",
+                    "value": "{MyEnvironmentVar}"
+                }
+            ]
+        }
+    ],
+    "networkMode": "bridge",
+    "family": "{ServiceName}"
+}

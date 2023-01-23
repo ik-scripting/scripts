@@ -1,0 +1,17 @@
+{
+    "ListenerArn": "{LoadBalancerListener}",
+    "Conditions": [
+        {
+            "Field": "path-pattern",
+            "Values": [
+                "/{ProjectName}/{Version}*"
+            ]
+        }
+    ],
+    "Actions": [
+        {
+            "Type": "forward",
+            "TargetGroupArn": "{TargetGroupArn}"
+        }
+    ]
+}

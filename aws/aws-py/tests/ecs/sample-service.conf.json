@@ -1,0 +1,17 @@
+{
+    "cluster": "{ClusterArn}",
+    "serviceName": "{ServiceName}",
+    "taskDefinition": "{ServiceName}",
+    "loadBalancers": [
+        {
+            "targetGroupArn": "{TargetGroupArn}",
+            "containerName": "{ServiceName}",
+            "containerPort": 8080
+        }
+    ],
+    "desiredCount": 1,
+    "role": "enterprise-ecs-service-role",
+    "deploymentConfiguration": {
+        "minimumHealthyPercent": 50
+    }
+}
