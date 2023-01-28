@@ -1,3 +1,4 @@
+# https://github.com/ik-vms-dockers/packer-by-example/blob/master/build.sh
 #!/bin/bash
 #
 # Wraps up Packer with support for environment files and Packer Debug flags

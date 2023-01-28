@@ -1,4 +1,4 @@
-
+# https://github.com/ik-vms-dockers/packer-by-example/blob/master/iam_assume_role.sh
 #!/bin/bash
 #
 # Assume the given role, and print out a set of environment variables
