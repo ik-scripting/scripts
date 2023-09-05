@@ -3,3 +3,5 @@
 
 # List aurora dbs with maintance windows, and teams
 aws rds describe-db-clusters --filters Name=engine,Values=aurora-postgresql --query "DBClusters[*].{Team:TagList[?Key=='team'].Value | [0],Name:DBClusterIdentifier,Version:EngineVersion,Maintance:PreferredMaintenanceWindow}" --output=table
+
+aws rds describe-db-instances --filters Name=engine,Values=postgres --query "DBInstances[*].{Team:TagList[?Key=='team'].Value | [0],Name:DBInstanceIdentifier,Version:EngineVersion,Maintance:PreferredMaintenanceWindow}" --output=table
