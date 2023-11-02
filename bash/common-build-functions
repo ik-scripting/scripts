@@ -81,9 +81,9 @@ function generateAppPath() {
 }
 
 function useRootAppPath() {
-     APP_PATH=${CODE_PATH}
-     echo "Using root path : ${APP_PATH} as app directory"
-     echo "If you are using a multi-module project then you should be using generateAppPath instead."
+    APP_PATH=${CODE_PATH}
+    echo "Using root path : ${APP_PATH} as app directory"
+    echo "If you are using a multi-module project then you should be using generateAppPath instead."
 }
 
 function moveToAppDirectory() {
@@ -1000,7 +1000,7 @@ Region=${AWS_DEFAULT_REGION}"
     listenerrule_config_file="${module_path}/deploy/listenerrule.conf.json"
     service_config_file="${module_path}/deploy/service.conf.json"
     local_deployment_config="${module_path}/deploy/env/${CONFIG}.conf.json"
-    
+
     remote_deployment_config="${CLUSTER_CONFIG_CACHE}"
 
     ${BUILD_SCRIPT_PATH}/py/deploy_scripts/ecs_create_service.py \
