@@ -22,7 +22,7 @@ plan: validate
 		terraform plan \
 		cd ..
 	done
-	
+
 
 apply: plan
 	for module in $(MODULE_NAMES); do \
@@ -31,7 +31,7 @@ apply: plan
 		cd ..
 	done
 	cd $(MODULE_NAME)
-	
+
 
 destroy: init
 	for module in $(MODULE_NAMES); do \
@@ -39,7 +39,6 @@ destroy: init
 		terraform destroy -auto-approve \
 		cd ..
 	done
-	
+
 
 .PHONY: validate plan apply destroy
-© 2020 GitHub, Inc.
