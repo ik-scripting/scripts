@@ -9,3 +9,12 @@ aws rds describe-db-instances --filters Name=engine,Values=postgres --query "DBI
 # list snapshots
 aws rds describe-db-snapshots --db-instance-identifier $DB_NAME \
 --query "DBSnapshots[*].{Name:DBSnapshotIdentifier,CreationTime:SnapshotCreateTime,Arn:DBSnapshotArn}" --output=table
+
+# Only specific version
+aws rds describe-db-instances \
+  --query "DBInstances[?Engine=='postgres' && EngineVersion<'15'].DBInstanceIdentifier" \
+  --output json | jq .
+
+aws rds describe-db-instances --filters Name=engine,Values=postgres \
+  --query "DBInstances[?EngineVersion<'15'].{Team:TagList[?Key=='team'].Value | [0],Name:DBInstanceIdentifier,Version:EngineVersion,Maintance:PreferredMaintenanceWindow}" \
+  --output=table
