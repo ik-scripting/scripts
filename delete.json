@@ -1,0 +1,18 @@
+{
+  "Comment": "some comment here",
+  "Changes": [
+    {
+      "Action": "DELETE",
+      "ResourceRecordSet": {
+          "Name": "x-plm-category-service-\\045\\041s\\050\\074nil\\076\\051-internal-eks.eu-west-1.dev.hbi.systems.",
+          "Type": "TXT",
+          "TTL": 300,
+          "ResourceRecords": [
+            {
+              "Value": "\"heritage=external-dns,external-dns/owner=extdns,external-dns/resource=crd/apps/plm-category-service-internal-eks.eu-west-1.dev.hbi.systems\""
+            }
+          ]
+      }
+    }
+  ]
+}
