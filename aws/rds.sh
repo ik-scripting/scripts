@@ -15,6 +15,9 @@ aws rds describe-db-instances \
   --query "DBInstances[?Engine=='postgres' && EngineVersion<'15'].DBInstanceIdentifier" \
   --output json | jq .
 
-aws rds describe-db-instances --filters Name=engine,Values=postgres \
-  --query "DBInstances[?EngineVersion<'15'].{Team:TagList[?Key=='team'].Value | [0],Name:DBInstanceIdentifier,Version:EngineVersion,Maintance:PreferredMaintenanceWindow}" \
+aws rds describe-db-instances --filters Name=engine,Values=mysql \
+  --query "DBInstances[?EngineVersion<'9'].{Team:TagList[?Key=='team'].Value | [0],Name:DBInstanceIdentifier,Version:EngineVersion,Maintance:PreferredMaintenanceWindow}" \
   --output=table
+
+# db migration https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_UpgradeDBInstance.PostgreSQL.html#USER_UpgradeDBInstance.PostgreSQL.MajorVersion
+aws rds describe-db-engine-versions --engine postgres  --engine-version your-version --query "DBEngineVersions[*].ValidUpgradeTarget[*].{EngineVersion:EngineVersion}" --output text
