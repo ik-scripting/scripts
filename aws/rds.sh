@@ -21,11 +21,4 @@ aws rds describe-db-instances --filters Name=engine,Values=mysql \
 
 # db migration https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_UpgradeDBInstance.PostgreSQL.html#USER_UpgradeDBInstance.PostgreSQL.MajorVersion
 aws rds describe-db-engine-versions --engine postgres  --engine-version your-version --query "DBEngineVersions[*].ValidUpgradeTarget[*].{EngineVersion:EngineVersion}" --output text
-
-Sean Green SeanGreen@hollandandbarrett.com
-Paris Apostolopoulos ParisApostolopoulos@hollandandbarrett.com
-Jonathan Payne JonPayne1@hollandandbarrett.com
-Timur Igorevich TimurIgorevich@hollandandbarrett.com
-Sara Stirk-Williams SaraStirk-Williams@hollandandbarrett.com
-
-Sergey Svistunov SergeySvistunov@hollandandbarrett.com
+# tet it
