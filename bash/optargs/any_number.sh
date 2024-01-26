@@ -4,7 +4,7 @@ function help_text {
     Usage: $0 [ -p|--profile PROFILE ] [ -r|--report-bucket REPORT_BUCKET ] [-h]
         PROFILE         (optional) The profile to use from ~/.aws/credentials.
         REPORT_BUCKET   (required) name of the S3 bucket to upload the reports to. Must be in same AWS account as profile.
-                                   It must be provided.
+                                  It must be provided.
 EOF
     exit 1
 }

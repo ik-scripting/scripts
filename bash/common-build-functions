@@ -36,11 +36,11 @@ function runDockerDaemonForLifetimeOfScript() {
 }
 
 function logVersionToS3 {
-     # only push versions for non feature builds
-     if [ ! "${FEATURE}" = "true" ]
-     then
-        echo "${APP_VERSION}" | aws s3 cp - s3://${PROJECT_VERSION_BUCKET}/${PROJECT_NAME}/version.txt
-     fi
+    # only push versions for non feature builds
+    if [ ! "${FEATURE}" = "true" ]
+    then
+    echo "${APP_VERSION}" | aws s3 cp - s3://${PROJECT_VERSION_BUCKET}/${PROJECT_NAME}/version.txt
+    fi
 }
 
 function installAwsPackagesForAlpineJava() {
