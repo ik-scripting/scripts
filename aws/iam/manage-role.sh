@@ -3,8 +3,8 @@
 # ./create-role.sh --create
 # ./create-role.sh --delete
 # 57 characters
-name="ik-test-9f3da91c-5df7-11ed-a319-935397d01831-575e5f629803"
-path="/eu-west-1/ns/eks-cluster-sandbox/"
+name="ik-test-9f3da91"
+path="/eu-west-1/ns/eks-cluster/"
 
 usage() {
   echo "Usage: for $0"
