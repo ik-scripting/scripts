@@ -133,7 +133,7 @@ def fetch_gitlab_pipelines(gitlab_url, private_token, project_id):
     today = date.today()
     offset_date = today - timedelta(days=DAYS_OFFSET)
     updated_before = offset_date.isoformat()
-    print(updated_before)
+    print(f"should be updated before date {updated_before}")
 
     while True:
         # https://docs.gitlab.com/ee/api/pipelines.html
