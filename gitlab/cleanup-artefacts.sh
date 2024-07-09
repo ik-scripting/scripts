@@ -13,6 +13,9 @@
 #
 # This code has been released under the terms of the Apache-2.0 license
 # http://opensource.org/licenses/Apache-2.0
+# https://forum.gitlab.com/t/remove-all-artifact-no-expire-options/9274/12
+# https://github.com/rafaelperoco/gitlab-artifacts-cleaner/blob/main/main.go
+# https://gitlab.com/thelabnyc/gitlab-storage-cleanup/-/blob/master/gitlabstoragecleanup/api.py?ref_type=heads
 
 set -u
 
