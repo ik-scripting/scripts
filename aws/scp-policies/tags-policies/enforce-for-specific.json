@@ -1,0 +1,15 @@
+{
+  "tags": {
+    "team": {
+      "tag_key": {
+        "@@assign": "team"
+      },
+      "enforced_for": {
+        "@@assign": [
+          "ec2:vpc",
+          "lambda:*"
+        ]
+      }
+    }
+  }
+}
