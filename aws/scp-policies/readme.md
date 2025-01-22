@@ -2,6 +2,7 @@
 
 #### SCP Tagging policies
 
+- [Policies overview](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies.html)
 - [Resource Tagging with SCP](https://aws.amazon.com/blogs/mt/implement-aws-resource-tagging-strategy-using-aws-tag-policies-and-service-control-policies-scps/)
 - [Tag Policies](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_example-tag-policies.html)
 - [Services and resource types that support enforcement](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_supported-resources-enforcement.html)
