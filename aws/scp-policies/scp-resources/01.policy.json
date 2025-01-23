@@ -1,0 +1,150 @@
+{
+  "Source": "https://repost.aws/questions/QU3VFWPyOxRN-0xqdMT9J3JA/scp-enforce-tags-on-resource-creation-fail",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenySCP1",
+      "Effect": "Deny",
+      "Action": [
+        "ec2:RunInstances",
+        "iam:CreateRole",
+        "iam:CreateUser",
+        "iam:CreateAccessKey",
+        "iam:CreateGroup",
+        "iam:CreatePolicy",
+        "iam:CreatePolicyVersion",
+        "logs:CreateLogDelivery",
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:CreateExportTask",
+        "elasticloadbalancing:CreateLoadBalancer",
+        "lambda:CreateFunction",
+        "acm:RequestCertificate",
+        "rds:CreateDBCluster",
+        "rds:CreateDBInstance",
+        "rds:CreateGlobalCluster",
+        "sns:CreateTopic",
+        "sqs:CreateQueue",
+        "secretsmanager:CreateSecret"
+      ],
+      "Resource": [
+        "arn:aws:ec2:*:*:instance/*",
+        "arn:aws:iam:*:*:user/*",
+        "arn:aws:iam:*:*:role/*",
+        "arn:aws:iam:*:*:group/*",
+        "arn:aws:iam:*:*:policy/*",
+        "arn:aws:logs:*:*:log-group:*",
+        "arn:aws:elasticloadbalancing:*:*:loadbalancer/*",
+        "arn:aws:lambda:*:*:function:*",
+        "arn:aws:acm:*:*:*",
+        "arn:aws:rds:*:*:cluster:*",
+        "arn:aws:rds:*:*:db:*",
+        "arn:aws:rds:*:*:global-cluster:*",
+        "arn:aws:sns:*:*:*",
+        "arn:aws:sqs:*:*:*",
+        "arn:aws:secretsmanager:*:*:secret:*"
+      ],
+      "Condition": {
+        "Null": {
+          "aws:RequestTag/Automation": "true"
+        }
+      }
+    },
+    {
+      "Sid": "DenySCP2",
+      "Effect": "Deny",
+      "Action": [
+        "ec2:RunInstances",
+        "iam:CreateRole",
+        "iam:CreateUser",
+        "iam:CreateAccessKey",
+        "iam:CreateGroup",
+        "iam:CreatePolicy",
+        "iam:CreatePolicyVersion",
+        "logs:CreateLogDelivery",
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:CreateExportTask",
+        "elasticloadbalancing:CreateLoadBalancer",
+        "lambda:CreateFunction",
+        "acm:RequestCertificate",
+        "rds:CreateDBCluster",
+        "rds:CreateDBInstance",
+        "rds:CreateGlobalCluster",
+        "sns:CreateTopic",
+        "sqs:CreateQueue",
+        "secretsmanager:CreateSecret"
+      ],
+      "Resource": [
+        "arn:aws:ec2:*:*:instance/*",
+        "arn:aws:iam:*:*:user/*",
+        "arn:aws:iam:*:*:role/*",
+        "arn:aws:iam:*:*:group/*",
+        "arn:aws:iam:*:*:policy/*",
+        "arn:aws:logs:*:*:log-group:*",
+        "arn:aws:elasticloadbalancing:*:*:loadbalancer/*",
+        "arn:aws:lambda:*:*:function:*",
+        "arn:aws:acm:*:*:*",
+        "arn:aws:rds:*:*:cluster:*",
+        "arn:aws:rds:*:*:db:*",
+        "arn:aws:rds:*:*:global-cluster:*",
+        "arn:aws:sns:*:*:*",
+        "arn:aws:sqs:*:*:*",
+        "arn:aws:secretsmanager:*:*:secret:*"
+      ],
+      "Condition": {
+        "Null": {
+          "aws:RequestTag/Name": "true"
+        }
+      }
+    },
+    {
+      "Sid": "DenySCP3",
+      "Effect": "Deny",
+      "Action": [
+        "ec2:RunInstances",
+        "iam:CreateRole",
+        "iam:CreateUser",
+        "iam:CreateAccessKey",
+        "iam:CreateGroup",
+        "iam:CreatePolicy",
+        "iam:CreatePolicyVersion",
+        "logs:CreateLogDelivery",
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:CreateExportTask",
+        "elasticloadbalancing:CreateLoadBalancer",
+        "lambda:CreateFunction",
+        "acm:RequestCertificate",
+        "rds:CreateDBCluster",
+        "rds:CreateDBInstance",
+        "rds:CreateGlobalCluster",
+        "sns:CreateTopic",
+        "sqs:CreateQueue",
+        "secretsmanager:CreateSecret"
+      ],
+      "Resource": [
+        "arn:aws:ec2:*:*:instance/*",
+        "arn:aws:iam:*:*:user/*",
+        "arn:aws:iam:*:*:role/*",
+        "arn:aws:iam:*:*:group/*",
+        "arn:aws:iam:*:*:policy/*",
+        "arn:aws:logs:*:*:log-group:*",
+        "arn:aws:elasticloadbalancing:*:*:loadbalancer/*",
+        "arn:aws:lambda:*:*:function:*",
+        "arn:aws:acm:*:*:*",
+        "arn:aws:rds:*:*:cluster:*",
+        "arn:aws:rds:*:*:db:*",
+        "arn:aws:rds:*:*:global-cluster:*",
+        "arn:aws:sns:*:*:*",
+        "arn:aws:sqs:*:*:*",
+        "arn:aws:secretsmanager:*:*:secret:*"
+      ],
+      "Condition": {
+        "Null": {
+          "aws:RequestTag/Customer": "true"
+        }
+      }
+    }
+  ]
+}

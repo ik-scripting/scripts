@@ -1,0 +1,18 @@
+{
+  "Description": "not-valid",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowDeleteTagsExceptSpecificTags",
+      "Effect": "Deny",
+      "Action": "ec2:DeleteTags",
+      "Resource": "arn:aws:ec2:*:*:instance/*",
+      "Condition": {
+        "Null": {
+          "aws:RequestTag/Customer": "true",
+          "aws:RequestTag/Name": "true"
+        }
+      }
+    }
+  ]
+}
