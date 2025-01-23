@@ -1,0 +1,66 @@
+{
+  "tags": {
+    "env": {
+      "tag_key": {
+        "@@assign": "env"
+      },
+      "tag_value": {
+        "@@assign": [
+          "sandbox"
+        ]
+      },
+      "enforced_for": {
+        "@@assign": [
+          "lambda:*"
+        ]
+      }
+    },
+    "product": {
+      "tag_key": {
+        "@@assign": "product"
+      }
+    },
+    "repository": {
+      "tag_key": {
+        "@@assign": "repository"
+      },
+      "enforced_for": {
+        "@@assign": [
+          "lambda:*"
+        ]
+      }
+    },
+    "team": {
+      "tag_key": {
+        "@@assign": "team"
+      },
+      "tag_value": {
+        "@@assign": [
+          "paas",
+          "devex",
+          "sre"
+        ]
+      },
+      "enforced_for": {
+        "@@assign": [
+          "lambda:*"
+        ]
+      }
+    },
+    "vertical": {
+      "tag_key": {
+        "@@assign": "vertical"
+      },
+      "tag_value": {
+        "@@assign": [
+          "platform"
+        ]
+      },
+      "enforced_for": {
+        "@@assign": [
+          "lambda:*"
+        ]
+      }
+    }
+  }
+}
