@@ -1,0 +1,67 @@
+
+# Guard gitlab ci pipeline job for multiple parallel executions which enqueues the current pipeline in the queue to maintain a lock.
+  # Gitlab Currently does not support pipeline level locks natively
+  # issue https://gitlab.com/gitlab-org/gitlab/-/issues/202691
+  # issue https://gitlab.com/gitlab-org/gitlab-foss/-/issues/41560
+  # 3rd party solution https://gitlab.com/shalomb/gitlab-job-guard 4+ years old
+.pipeline-level-guard:
+  stage: pipeline-guard
+  extends: [ .ci-runner-config-anywhere ]
+  resource_group: pipeline-level-guard
+  image: docker.io/python:3.12-slim
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  script:
+  - |
+    # in 'gitlab-ci-snippets/pipeline-lock/.gitlab-ci.yml#pipeline-lock'
+    if [ -z "${CI_READ_ACCESS}" ]; then
+      echo -e "${TXT_YELLOW}CI_READ_ACCESS token with read_api scope is not provided.${TXT_CLEAR}"
+      exit 1
+    fi
+    cat << EOF > "$CI_PROJECT_DIR/guard_lock.py"
+    # -*- coding: utf-8 -*-
+
+    import http.client, os, json, time
+
+    # The API endpoint
+    # https://docs.gitlab.com/ee/api/pipelines.html
+    HOST = "gitlab.com"
+    URL = "/api/v4/projects/$CI_PROJECT_ID/pipelines?per_page=100&scope=running"
+    URL = URL.replace("$CI_PROJECT_ID", os.environ["CI_PROJECT_ID"])
+    RETRY_COUNT = int(os.getenv('RETRY_COUNT', 30))
+    SLEEP_TIME = int(os.getenv('SLEEP_TIME', 30))
+
+    headers = {"Content-Type": "application/json", "PRIVATE-TOKEN" : os.environ["CI_READ_ACCESS"]}
+
+    def list_running_pipelines() -> list:
+      '''List running pipelines for this project.'''
+      conn.request("GET", URL, headers=headers)
+      response = conn.getresponse()
+      if response.status != 200:
+        raise Exception(f"response status is {response.status}")
+      return json.loads(response.read().decode("utf-8"))
+
+    if __name__ == "__main__":
+      conn = http.client.HTTPSConnection(HOST)
+      counter = 0
+      status = False
+      while counter <= RETRY_COUNT or status == False:
+        result = list_running_pipelines()
+        print(result)
+        counter += 1
+        retry_left = RETRY_COUNT - counter
+        time_left = retry_left * SLEEP_TIME
+        if len(result) > 1:
+          print(f"Pipelines count {len(result)}. Retries left {retry_left}. Terminate pipeline in {time_left} seconds.")
+          time.sleep(SLEEP_TIME)
+        elif len(result) <= 1:
+          print('Zero or Single pipeline found. Skip...')
+          status = True
+          break
+        if counter == RETRY_COUNT:
+          print('Terminating with exit code 1...')
+          os.exit(62) # bash exit codes https://www.cyberciti.biz/faq/linux-bash-exit-status-set-exit-statusin-bash/
+      print('Time to execute a pipeline')
+      conn.close()
+    EOF
+  - python $CI_PROJECT_DIR/guard_lock.py
